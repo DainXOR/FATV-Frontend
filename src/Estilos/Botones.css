@@ -1,0 +1,80 @@
+/*Diseño de los botones*/
+
+.button-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  font-family: Arial;
+  color: white;
+  padding: 30px;
+}
+
+.button-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 30px;
+  width: 280px;
+}
+
+.button {
+  padding: 12px 30px;
+  background-color: #FFBA08 !important;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.button:hover {
+  background-color: #17a55f;
+  color: white;
+}
+
+.images {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 20px;
+}
+
+.button-title {
+  color: white;
+  font-family: Arial;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 15px 0 12px 0;
+  text-align: center;
+}
+
+.button-description {
+  color: white;
+  font-family: Arial;
+  font-size: 18px;
+  margin: 0 0 20px 0;
+  text-align: center;
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .images {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .button-item {
+    width: 180px;
+    padding: 15px;
+  }
+  
+  .button-title {
+    font-size: 14px;
+  }
+  
+  .button-description {
+    font-size: 11px;
+  }
+}

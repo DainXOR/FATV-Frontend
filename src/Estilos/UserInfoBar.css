@@ -1,0 +1,117 @@
+/*Estilos para mostrar el nombre y rol de usuario en la parte superior derecha*/
+.user-info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 20px;
+    background-color: #ededf1;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.user-text {
+    margin-right: 10px;
+    text-align: right;
+}
+
+.user-name {
+    font-weight: bold;
+    color: #222D56;
+    font-size: 22px;
+}
+
+.user-role {
+    font-size: 22px;
+    background-color: #d8f5e4;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-block;
+    margin-top: 2px;
+    color: #388e3c;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Notification Center Styles */
+.notification-center {
+    position: relative;
+    margin: 0 16px;
+}
+.notification-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 26px;
+    position: relative;
+    outline: none;
+}
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #e53935;
+    color: #fff;
+    border-radius: 50%;
+    padding: 2px 7px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 2;
+}
+.notification-dropdown {
+    position: absolute;
+    right: 0;
+    top: 36px;
+    width: 420px;
+    max-height: 520px;
+    font-size: 20px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    z-index: 10;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+}
+.notification-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 23px;
+}
+.notification-item {
+    padding: 18px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.2s;
+        font-size: 23px;
+}
+.notification-item:last-child {
+    border-bottom: none;
+}
+.notification-item:hover {
+    background: #f5f7fa;
+}
+.notification-title {
+    font-weight: 600;
+    color: #222D56;
+    font-size: 30px;
+}
+
+.notification-loading,
+.notification-error,
+.notification-empty {
+    padding: 18px;
+    text-align: center;
+    color: #888;
+}
+
+.notification-bell {
+    display: block;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}

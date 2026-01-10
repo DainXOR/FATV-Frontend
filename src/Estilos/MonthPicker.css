@@ -1,0 +1,97 @@
+/* Contenedor */
+.monthpicker-wrapper {
+  position: relative;
+  width: 25%;
+  font-family: sans-serif;
+}
+
+/* Card del input */
+.monthpicker-input {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.monthpicker-input:hover {
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+}
+
+.calendar-icon {
+  color: #6b7280;
+}
+
+/* Popup estilo tarjeta Material */
+.monthpicker-popup {
+  position: absolute;
+  top: 60px;
+  width: 100%;
+  background: #DCEBF9;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0px 10px 25px rgba(0,0,0,0.20);
+  z-index: 100;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Animación */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header del popup */
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+
+}
+
+.popup-year {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.nav-btn {
+  background: #708BC6 ;
+  border: none;
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  width: 6%;
+}
+
+.nav-btn:hover {
+  background: #e2e2e2;
+}
+
+/* Grid de meses */
+.months-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* Botón estilo "pill" */
+.month-pill {
+  padding: 10px 0;
+  border-radius: 25px;
+  background: #7C76B5;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.month-pill:hover {
+  background: #e3eaff;
+  color: 222D56f;
+}

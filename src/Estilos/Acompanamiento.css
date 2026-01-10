@@ -1,0 +1,437 @@
+/* form para agregar acompañamiento */
+
+.form-container {
+    margin: 40px auto;
+    padding: 40px;
+    width: auto; 
+    max-width: 50%; 
+    max-height: 60%;
+    background-color: #ededf1;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    color: #555;
+    flex: 1; 
+}
+.acompanamiento-layout {
+    display: flex;
+    gap: 0; 
+    flex-direction: row-reverse; 
+    align-items: stretch; 
+    justify-content: center;
+    max-width: 100%;
+}
+.acompanamiento-image {
+    width: 50%;
+    max-width: 30%; 
+    min-width: 40%; 
+    height: 70%;
+    display: block;
+    object-fit: contain;
+    border-radius: 8px; 
+    margin-right: auto;
+}
+
+@media screen and (max-width: 900px) {
+    .acompanamiento-image {
+        display: none; 
+    }
+    .acompanamiento-layout { flex-direction: column; }
+}
+.form-container h2 {
+    text-align: center;
+    font-size: 36px; 
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #222D56;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 35px; 
+}
+
+label {
+    font-weight: bold;
+    font-size:27px;
+    display: block;
+}
+
+input, select {
+    padding: 20px;
+    font-size: 30px;
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Grupo específico para campos de fecha */
+.date-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.date-group label {
+    margin-right: 15px;
+    font-size: 27px;
+    min-width: 80px;
+}
+
+.date-time-select-group {
+    display: flex;
+    gap: 15px;
+    flex: 1;
+    align-items: center;
+}
+
+.date-time-select-group select {
+    flex: 1;
+    min-width: 100px;
+    padding: 15px;
+    font-size: 24px; 
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+/* Grupo específico para campos de hora */
+.time-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.time-group label {
+    margin-right: 15px;
+    font-size: 27px;
+    min-width: 80px;
+}
+
+.time-select-group {
+    display: flex;
+    gap: 15px;
+    flex: 1;
+    align-items: center;
+}
+
+.time-select-group select {
+    flex: 1;
+    min-width: 80px;
+    padding: 15px;
+    font-size: 20px; 
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+/* Campo de observaciones */
+.observaciones-group {
+    display: flex;
+    flex-direction: column;
+    font-size: 24px;
+}
+
+.observaciones-textarea {
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #d8d3d3;
+    font-size: 24px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+}
+
+/* Estilos para el botón */
+button {
+    margin-top: 20px;
+    padding: 15px 30px;
+    background-color: #222D56;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 25px;
+    font-weight: bold;
+    align-self: center;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #222D56;
+}
+
+
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.autocomplete-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    background-color: #fff;
+    font-size: 22px;
+    transition: background-color 0.2s ease;
+}
+
+.autocomplete-item:hover {
+    background-color: #f0f0f0;
+}
+/* form para agregar acompañamiento */
+
+.acompanamiento-layout {
+    display: flex;
+    gap: 0; 
+    flex-direction: row-reverse; 
+    align-items: stretch; 
+    justify-content: center;
+    max-width: 100%;
+}
+.acompanamiento-image {
+    width: 40%;
+    max-width: 30%; 
+    min-width: 30%; 
+    height: 70%;
+    display: block;
+    object-fit: contain;
+    border-radius: 8px; 
+}
+
+@media screen and (max-width: 900px) {
+    .acompanamiento-image {
+        display: none; 
+    }
+    .acompanamiento-layout { flex-direction: column; }
+}
+.form-container h2 {
+    text-align: center;
+    font-size: 36px; 
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #222D56;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 35px; /* Más espacio entre grupos de campos */
+}
+
+label {
+    font-weight: bold;
+    font-size: 27px;
+    display: block;
+}
+
+input, select {
+    padding: 20px;
+    font-size: 24px;
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Grupo específico para campos de fecha */
+.date-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.date-group label {
+    margin-right: 15px;
+    font-size: 27px;
+    min-width: 80px;
+}
+
+.date-time-select-group {
+    display: flex;
+    gap: 15px;
+    flex: 1;
+    align-items: center;
+}
+
+.date-time-select-group select {
+    flex: 1;
+    min-width: 100px;
+    padding: 15px;
+    font-size: 24px; 
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+/* Grupo específico para campos de hora */
+.time-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.time-group label {
+    margin-right: 15px;
+    font-size: 27px;
+    min-width: 80px;
+}
+
+.time-select-group {
+    display: flex;
+    gap: 15px;
+    flex: 1;
+    align-items: center;
+}
+
+.time-select-group select {
+    flex: 1;
+    min-width: 80px;
+    padding: 15px;
+    font-size: 20px; /* Tamaño de letra más grande */
+    border: 1px solid #d8d3d3;
+    border-radius: 8px;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+/* Campo de observaciones */
+.observaciones-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.observaciones-textarea {
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #d8d3d3;
+    font-size: 24px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+button {
+    margin-top: 20px;
+    padding: 15px 30px;
+    background-color: #222D56;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 25px;
+    font-weight: bold;
+    align-self: center;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #222D56;
+}
+
+
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.autocomplete-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    background-color: #fff;
+    font-size: 22px;
+    transition: background-color 0.2s ease;
+}
+
+.autocomplete-item:hover {
+    background-color: #f0f0f0;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+/* Scrollbar personalizada para el dropdown */
+.autocomplete-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+    .form-container {
+        width: 95%;
+        max-height: 70%;
+        padding: 20px;
+    }
+    
+    .date-group,
+    .time-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .date-group label,
+    .time-group label {
+        margin-bottom: 2px;
+    }
+    
+    .date-time-select-group,
+    .time-select-group {
+        width: 100%;
+    }
+}

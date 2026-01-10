@@ -1,0 +1,275 @@
+/* Diseños para la tabla de visualización y edición de datos de los estudiantes */
+.tabla-estudiantes {
+    padding: 24px;
+    display: flex;
+    justify-content: center; /* centrar la tarjeta en la página */
+}
+
+.titulo-tabla {
+    color: #ffffff !important;
+    font-weight: bold;
+    margin-bottom: 10px;
+    font-size: 32px; 
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.tabla-container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 3000px;
+    overflow: hidden;
+}
+
+.tabla-container .header {
+    background-color: #222D56 !important;
+    padding: 22px 20px;
+    border-radius: 10px 10px 0 0;
+    color: white;
+}
+
+.tabla-container .header-subtitle {
+    color: rgba(255,255,255,0.9);
+    margin-top: 8px;
+    font-size: 16px;
+}
+
+.tabla-estudiantes table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.tabla-estudiantes th, .tabla-estudiantes td {
+    padding: 12px;
+    border: 1px solid #eee;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.tabla-estudiantes th {
+    background-color: #222D56 !important;
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+}
+
+/*Contenido de la tabla */
+.tabla-estudiantes td {
+    font-size: 24px;
+}
+
+.tabla-estudiantes tbody tr:hover {
+    background-color: #f8fbff;
+}
+
+.tabla-estudiantes input {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Contenedor interior que permite scroll horizontal si la tabla es más ancha */
+.table-scroll {
+    overflow-x: auto;
+    padding: 16px;
+}
+
+.acciones {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.pagination-info {
+    color: #6c757d;
+    font-size: 20px;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pagination-button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.pagination-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-prev {
+font-size: 20px;
+background: #7C76B5 !important;
+color: white !important;
+}
+
+.pagination-prev:hover:not(:disabled) {
+    background: #7C3AED;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(139, 92, 246, 0.4);
+}
+
+
+.pagination-next {
+    background: #7C76B5 !important;
+    font-size: 20px;
+    color: white !important;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+.pagination-next:hover:not(:disabled) {
+    background: #708BC6 ;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(6, 182, 212, 0.4);
+}
+
+/* Estilos adicionales para mejor legibilidad */
+.table-header-cell {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.table-cell {
+    font-size: 16px;
+    color: #374151;
+    font-weight: 500;
+}
+
+.pagination-text {
+    font-size: 20px;
+    color: #4B5563;
+    font-weight: 500;
+}
+
+.pagination-current, .pagination-total {
+    font-weight: 700;
+    color: #1F2937;
+}
+
+/* Estilos para los filtros */
+.filter-label {
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.filter-select {
+    font-size: 16px;
+    padding: 8px 12px;
+}
+
+@media (max-width: 768px) {
+    .titulo-tabla {
+        font-size: 28px;
+        padding: 12px;
+    }
+    
+    .tabla-estudiantes {
+        padding: 15px;
+    }
+    
+    .pagination-container {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 15px;
+    }
+    
+    .pagination-controls {
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .pagination-button {
+        min-width: 100px;
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+    
+    .tabla-estudiantes th, .tabla-estudiantes td {
+        padding: 8px;
+        font-size: 20px;
+    }
+    
+    .tabla-estudiantes th {
+        font-size: 18px;
+    }
+}
+
+/* Móviles */
+@media (max-width: 480px) {
+    .titulo-tabla {
+        font-size: 24px;
+        padding: 10px;
+    }
+    
+    .tabla-estudiantes {
+        padding: 10px;
+    }
+    
+    .pagination-container {
+        padding: 10px;
+        gap: 10px;
+    }
+    
+    .pagination-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .pagination-button {
+        width: 100%;
+        min-width: auto;
+        padding: 12px;
+        font-size: 16px;
+    }
+    
+    .tabla-estudiantes th, .tabla-estudiantes td {
+        padding: 6px;
+        font-size: 20px;
+    }
+    
+    .tabla-estudiantes th {
+        font-size: 14px;
+    }
+    
+    .tabla-estudiantes input {
+        font-size: 14px;
+        padding: 4px;
+    }
+    
+    .pagination-info {
+        font-size: 12px;
+    }
+    
+    .pagination-text {
+        font-size: 14px;
+    }
+}

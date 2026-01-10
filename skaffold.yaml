@@ -1,0 +1,19 @@
+apiVersion: skaffold/v4beta2
+kind: Config
+profiles:
+  - name: atv-cloud-run
+    manifests:
+      rawYaml:
+        - resources/cloudrun.yaml
+    build:
+      local:
+        push: true 
+      platforms: ["linux/amd64"]
+      artifacts:
+        - image: gcr.io/services-experiments/atv-back
+          docker:
+            dockerfile: docker/Dockerfile
+    deploy:
+      cloudrun:
+        projectid: services-experiments
+        region: us-central1
