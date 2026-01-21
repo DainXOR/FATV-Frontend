@@ -76,13 +76,13 @@ const RegisterStudentPage = ({ user }) => {
                     }
                 }
             );
-            console.log('Token JWT:', token);
-            console.log('Usuario creado exitosamente:', response.data);
+            console.log('JWT Token:', token);
+            console.log('User created successfully:', response.data);
             Swal.fire({
-                title: '¡Éxito!',
-                text: 'Datos guardados exitosamente',
+                title: 'Success!',
+                text: 'Data saved successfully',
                 icon: 'success',
-                confirmButtonText: 'Aceptar',
+                confirmButtonText: 'Accept',
                 confirmButtonColor: '#28a745'
             });
             setFormData({
@@ -101,33 +101,33 @@ const RegisterStudentPage = ({ user }) => {
                 id_university: ''
             });
         } catch (error) {
-            console.error('Error al enviar los datos:', error);
+            console.error('Error sending data:', error);
             Swal.fire({
                 title: 'Error',
-                text: 'Error al enviar los datos',
+                text: 'Error sending data',
                 icon: 'error',
-                confirmButtonText: 'Aceptar',
+                confirmButtonText: 'Accept',
                 confirmButtonColor: '#d33'
             });
             if (error.response) {
-                console.error('Error del servidor:', error.response.data);
-                alert(`Error del servidor: ${error.response.status} - ${error.response.data.message || 'Error desconocido'}`);
+                console.error('Server error:', error.response.data);
+                alert(`Server error: ${error.response.status} - ${error.response.data.message || 'Unknown error'}`);
             } else if (error.request) {
-                console.error('No se recibió respuesta del servidor');
+                console.error('No response from server');
                 Swal.fire({
                     title: 'Error',
-                    text: 'No hay conexión',
+                    text: 'No connection',
                     icon: 'error',
-                    confirmButtonText: 'Aceptar',
+                    confirmButtonText: 'Accept',
                     confirmButtonColor: '#d33'
                 });
             } else {
-                console.error('Error al configurar la petición:', error.message);
+                console.error('Request setup error:', error.message);
                 Swal.fire({
                     title: 'Error',
-                    text: 'No se pudo configurar',
+                    text: 'Could not configure request',
                     icon: 'error',
-                    confirmButtonText: 'Aceptar',
+                    confirmButtonText: 'Accept',
                     confirmButtonColor: '#d33'
                 });
             }
@@ -136,10 +136,10 @@ const RegisterStudentPage = ({ user }) => {
     };
     return (
         <div> 
-            <h2>Registrar estudiante</h2>
+            <h2>Register Student</h2>
             <form onSubmit={handleSubmit} className="contact-form">
                 <div>
-                    <label>Nombre <span className="required-asterisk">*</span></label>
+                    <label>First Name <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="first_name" 
@@ -149,7 +149,7 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <div>
-                    <label>Apellido <span className="required-asterisk">*</span></label>
+                    <label>Last Name <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="last_name" 
@@ -159,7 +159,7 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <div>
-                    <label>Número de identificación <span className="required-asterisk">*</span></label>
+                    <label>ID Number <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="number_id" 
@@ -169,7 +169,7 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <div>
-                    <label>Número de celular <span className="required-asterisk">*</span></label>
+                    <label>Phone Number <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="phone_number" 
@@ -179,7 +179,7 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <div>
-                    <label>Correo personal <span className="required-asterisk">*</span></label>
+                    <label>Personal Email <span className="required-asterisk">*</span></label>
                     <input 
                         type="email" 
                         name="email" 
@@ -189,7 +189,7 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <div>
-                    <label>Correo institucional <span className="required-asterisk">*</span></label>
+                    <label>Institutional Email <span className="required-asterisk">*</span></label>
                     <input 
                         type="email" 
                         name="institution_email" 
@@ -199,36 +199,36 @@ const RegisterStudentPage = ({ user }) => {
                     />
                 </div>
                 <fieldset className="direccion-group">
-                    <legend>Dirección de residencia</legend>
+                    <legend>Residence Address</legend>
                     <div className="direccion-row">
                         <div className="direccion-col">
-                            <label>Tipo de vía <span className="required-asterisk">*</span></label>
+                            <label>Street Type <span className="required-asterisk">*</span></label>
                             <select name="streetType" value={formData.streetType} onChange={handleChange} required>
-                                <option value="">Seleccione</option>
-                                <option value="Avenida">Avenida</option>
-                                <option value="Calle">Calle</option>
-                                <option value="Carrera">Carrera</option>
-                                <option value="Transversal">Transversal</option>
+                                <option value="">Select</option>
+                                <option value="Avenida">Avenue</option>
+                                <option value="Calle">Street</option>
+                                <option value="Carrera">Road</option>
+                                <option value="Transversal">Crossroad</option>
                             </select>
                         </div>
                         <div className="direccion-col">
-                            <label>Número de vía <span className="required-asterisk">*</span></label>
+                            <label>Street Number <span className="required-asterisk">*</span></label>
                             <input type="text" name="streetNumber" value={formData.streetNumber} onChange={handleChange} required />
                         </div>
                         <div className="direccion-col">
-                            <label># de casa o edificio <span className="required-asterisk">*</span></label>
+                            <label>Building Number <span className="required-asterisk">*</span></label>
                             <input type="text" name="buildingNumber" value={formData.buildingNumber} onChange={handleChange} required />
                         </div>
                     </div>
                     <div className="direccion-row">
                         <div className="direccion-col">
-                            <label>Apartamento (si aplica)</label>
+                            <label>Apartment (if applicable)</label>
                             <input type="text" name="apartment" value={formData.apartment} onChange={handleChange} />
                         </div>
                         <div className="direccion-col">
-                            <label>Municipio <span className="required-asterisk">*</span></label>
+                            <label>Municipality <span className="required-asterisk">*</span></label>
                             <select name="municipality" value={formData.municipality} onChange={handleChange} required>
-                                <option value="">Seleccione</option>
+                                <option value="">Select</option>
                                 <option value="Bello">Bello</option>
                                 <option value="Medellín">Medellín</option>
                                 <option value="Itagüí">Itagüí</option>
@@ -239,26 +239,26 @@ const RegisterStudentPage = ({ user }) => {
                     </div>
                 </fieldset>
                 <div>
-                    <label>Semestre <span className="required-asterisk">*</span></label>
+                    <label>Semester <span className="required-asterisk">*</span></label>
                     <select name="semester" value={formData.semester} onChange={handleChange} required>
-                        <option value="">Seleccione</option>
+                        <option value="">Select</option>
                         {[...Array(9)].map((_, i) => (
                             <option key={i + 1} value={i + 1}>{i + 1}</option>
                         ))}
                     </select>
                 </div>
                 <div>
-                    <label>Universidad <span className="required-asterisk">*</span></label>
+                    <label>University <span className="required-asterisk">*</span></label>
                     <select name="id_university" value={formData.id_university} onChange={handleChange} required>
-                        <option value="">Seleccione</option>
-                        <option value="Universidad de Antioquia">Universidad de Antioquia</option>
-                        <option value="Universidad Nacional">Universidad Nacional</option>
-                        <option value="Universidad EAFIT">Universidad EAFIT</option>
+                        <option value="">Select</option>
+                        <option value="Universidad de Antioquia">University of Antioquia</option>
+                        <option value="Universidad Nacional">National University</option>
+                        <option value="Universidad EAFIT">EAFIT University</option>
                     </select>
                 </div>
                 <div className="button-group">
-                    <button className="btn limpiar" type="button" onClick={handleReset}>Limpiar</button>
-                    <button className="btn guardar" type="submit">Guardar</button>
+                    <button className="btn limpiar" type="button" onClick={handleReset}>Clear</button>
+                    <button className="btn guardar" type="submit">Save</button>
                 </div>
             </form>
         </div>

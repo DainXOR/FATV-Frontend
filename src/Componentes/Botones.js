@@ -5,42 +5,43 @@ import '../Estilos/Botones.css';
 function Botones({ onNavigate }) {
   const buttonData = [
     {
-      id: 'registrar',
+      id: 'register',
       title: 'Registro de estudiantes',
       buttonText: 'Registrar datos',
       image: 'registrar.png',
-      alt: 'registrar'
+      alt: 'register'
     },
     {
-      id: 'editar',
+      id: 'edit',
       title: 'Editar datos',
       description: 'Edita o actualiza la información de los estudiantes',
       buttonText: 'Editar datos',
       image: 'editar.png',
-      alt: 'editar'
+      alt: 'edit'
     },
     {
-      id: 'acompañar',
+      id: 'support',
       title: 'Acompañamientos',
       description: 'Añade nuevos acompañamientos',
       buttonText: 'Añadir acompañamiento',
       image: 'acompañar.png',
-      alt: 'acompañar'
+      alt: 'support'
     },
     {
-      id: 'acompanamientos',
+      id: 'support-history',
       title: 'Visualiza acompañamientos',
       description: 'Consulta métricas y estadísticas de los acompañamientos realizados por mes',
       buttonText: 'Acompañamientos',
       image: 'metricas.png',
-      alt: 'acompanamientos'
-    },    {
-      id: 'formulario',
+      alt: 'support-history'
+    },
+    {
+      id: 'form',
       title: 'Envíar caracterización',
       description: 'Crea y envía formularios de caracterización a estudiantes en riesgo de deserción',
       buttonText: 'Crear formulario',
       image: 'formulario.png',
-      alt: 'formulario'
+      alt: 'form'
     }
   ];
 

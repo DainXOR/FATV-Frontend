@@ -105,120 +105,116 @@ const buildQuestionsPayload = () => {
     console.log('Enviando formulario al backend:', formPayload);
 
     try {
-        const token = localStorage.getItem('token');
-
-        if (mode === 'manual') {
-            const newQuestionsWithIds = [];
-
-            for (const q of questionsPayload) {
-                // Validar opciones antes de crear el payload
-                if ((q.type === 'single_choice' || q.type === 'multiple_choice') && (!q.options || q.options.length === 0)) {
-                    throw new Error(`Las preguntas de tipo ${q.type} deben tener al menos una opción.`);
-                }
-
-                const questionBankPayload = {
-                    id_question_type: mapTypeToBackend(q.type),
-                    name: q.text.substring(0, 50), 
-                    question: q.text,
-                    options: (q.options || []).map(String),
-                };
-
-                console.log('PAYLOAD A /questions:', questionBankPayload);
-                console.log('id_question_type:', questionBankPayload.id_question_type); // Verifica el ID de tipo
-
-                const response = await axios.post(
-                    `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/`,
-                    questionBankPayload,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-
-                const newId = response.data?.data?.id || response.data?.id;
-
-                if (!newId) {
-                    throw new Error(`El backend no devolvió un ID para la pregunta: ${q.text}`);
-                }
-                newQuestionsWithIds.push({
-                    ...q,
-                    id: newId, 
-                    type: mapTypeToBackend(q.type),
-                });
-            }
-
-            questionsPayload = newQuestionsWithIds;
-        }
-
-        const formPayload = {
-            name: "Caracterización para " + selectedStudent.first_name,
-            description: "Diligencia esta caracterización para conocerte mejor",
-            date: new Date().toISOString(),
-            questions_info: questionsPayload.map((q, index) => ({
-                position: index + 1,
-                section: 1,
-                id_parent_question: "",
-                needed_answers: [],
-                id_question: q.id,
-                text: q.text,
-                type: mapTypeToBackend(q.type), 
-                options: q.options, 
-                optional: false
-            }))
-        };
-
-        console.log('Enviando formulario al backend:', formPayload);
-
-        // Enviar al backend para crear el formulario
-        const response = await axios.post(
-            `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/`,
-            formPayload,
+      const token = localStorage.getItem('token');
+      // Old axios logic (unchanged)
+      let oldQuestionsPayload = questionsPayload;
+      if (mode === 'manual') {
+        const newQuestionsWithIds = [];
+        for (const q of oldQuestionsPayload) {
+          if ((q.type === 'single_choice' || q.type === 'multiple_choice') && (!q.options || q.options.length === 0)) {
+            throw new Error(`Las preguntas de tipo ${q.type} deben tener al menos una opción.`);
+          }
+          const questionBankPayload = {
+            id_question_type: mapTypeToBackend(q.type),
+            name: q.text.substring(0, 50),
+            question: q.text,
+            options: (q.options || []).map(String),
+          };
+          const response = await axios.post(
+            `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/`,
+            questionBankPayload,
             {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
             }
-        );
-
-        console.log('Respuesta del backend:', response.data);
-
-        const formId = response.data?.data?.id || response.data?.id;
-
-        if (!formId) {
-            throw new Error('El backend no devolvió un ID de formulario');
+          );
+          const newId = response.data?.data?.id || response.data?.id;
+          if (!newId) {
+            throw new Error(`El backend no devolvió un ID para la pregunta: ${q.text}`);
+          }
+          newQuestionsWithIds.push({
+            ...q,
+            id: newId,
+            type: mapTypeToBackend(q.type),
+          });
         }
-
-        const baseUrl = window.location.origin;
-        const studentFormUrl = `${baseUrl}/student-form/${formId}`;
-
-        setGeneratedUrl(studentFormUrl);
-        setFormSuccess('URL generada correctamente. Comparte este enlace con el estudiante.');
-
-        Swal.fire({
-            title: '¡Formulario creado!',
-            text: 'El formulario ha sido generado exitosamente',
-            icon: 'success',
-            confirmButtonText: 'Aceptar',
-            confirmButtonColor: '#673ab7'
+        oldQuestionsPayload = newQuestionsWithIds;
+      }
+      const oldFormPayload = {
+        name: "Caracterización para " + selectedStudent.first_name,
+        description: "Diligencia esta caracterización para conocerte mejor",
+        date: new Date().toISOString(),
+        questions_info: oldQuestionsPayload.map((q, index) => ({
+          position: index + 1,
+          section: 1,
+          id_parent_question: "",
+          needed_answers: [],
+          id_question: q.id,
+          text: q.text,
+          type: mapTypeToBackend(q.type),
+          options: q.options,
+          optional: false
+        }))
+      };
+      // --- Old API call (commented for reference) ---
+      /*
+      const oldResponse = await axios.post(
+        `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/`,
+        oldFormPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const oldFormId = oldResponse.data?.data?.id || oldResponse.data?.id;
+      */
+      // --- New API call using FormApi ---
+      let newResponse, newFormId;
+      try {
+        // Set token for ApiClient
+        import('../api/ApiClient').then(({ default: ApiClient }) => {
+          ApiClient.setAuthToken(token);
         });
-
+        // Prepare new payload (should match old)
+        const FormApi = (await import('../api/FormApi')).default;
+        newResponse = await FormApi.createForm(oldFormPayload);
+        newFormId = newResponse.data?.data?.id || newResponse.data?.id;
+      } catch (apiError) {
+        console.error('Error with new FormApi:', apiError);
+        newFormId = null;
+      }
+      // Use new result
+      if (!newFormId) {
+        throw new Error('El backend no devolvió un ID de formulario');
+      }
+      const baseUrl = window.location.origin;
+      const studentFormUrl = `${baseUrl}/student-form/${newFormId}`;
+      setGeneratedUrl(studentFormUrl);
+      setFormSuccess('URL generada correctamente. Comparte este enlace con el estudiante.');
+      Swal.fire({
+        title: '¡Formulario creado!',
+        text: 'El formulario ha sido generado exitosamente',
+        icon: 'success',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#673ab7'
+      });
     } catch (error) {
-        console.error('Error al generar URL:', error);
-        const errorMsg = error.response?.data?.message || error.message || 'Error al crear el formulario';
-        setFormError(errorMsg);
-
-        Swal.fire({
-            title: 'Error',
-            text: errorMsg,
-            icon: 'error',
-            confirmButtonText: 'Aceptar',
-            confirmButtonColor: '#d33'
-        });
+      console.error('Error al generar URL:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Error al crear el formulario';
+      setFormError(errorMsg);
+      Swal.fire({
+        title: 'Error',
+        text: errorMsg,
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#d33'
+      });
     } finally {
-        setIsGenerating(false);
+      setIsGenerating(false);
     }
 };
 
