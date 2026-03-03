@@ -24,16 +24,20 @@ const HistorialAsesorias = ({ estudianteId, onVolver }) => {
             try {
                 setLoading(true);
                 const token = localStorage.getItem('jwt');
-                
-            const response = await axios.get(
-            `${API_URL}/asesorias/estudiante/${estudianteId}?page=${page}&limit=5`,
-            {
-                headers: { Authorization: `Bearer ${token}` }
-            }
-            );
-
-
-                if (response.data.success) {
+                // Old axios call (commented for reference)
+                /*
+                const response = await axios.get(
+                  `${API_URL}/asesorias/estudiante/${estudianteId}?page=${page}&limit=5`,
+                  {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }
+                );
+                */
+                // New API call
+                const SupportApi = (await import('../api/SupportApi')).default;
+                SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+                const response = await SupportApi.getStudentAsesorias(estudianteId, page, 5);
+                if (response.data?.success) {
                     setHistorial(response.data.data);
                 } else {
                     setError('No se pudieron cargar las asesorías');
@@ -45,7 +49,6 @@ const HistorialAsesorias = ({ estudianteId, onVolver }) => {
                 setLoading(false);
             }
         };
-
         if (estudianteId) {
             fetchHistorial();
         }

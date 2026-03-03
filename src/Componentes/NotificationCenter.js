@@ -15,18 +15,21 @@ const NotificationCenter = () => {
       setError(null);
       const fetchNotifications = async () => {
         try {
-          console.log('URL priority:', `${process.env.REACT_APP_BACKEND_URL}/api/v2/priorities/all`);
-          console.log('URL alert:', `${process.env.REACT_APP_BACKEND_URL}/api/v2/alerts/all`);
+          // Old axios calls (commented for reference)
+          /*
           const [res1, res2] = await Promise.all([
             axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/priorities/all`),
             axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/alerts/all`)
           ]);
-          console.log('Respuesta priority:', res1.data);
-          console.log('Respuesta alerts:', res2.data);
-          const priorityArray = Array.isArray(res1.data.data) ? res1.data.data : [];
-          const alertsArray = Array.isArray(res2.data.data) ? res2.data.data : [];
-          console.log('priorityArray:', priorityArray);
-          console.log('alertsArray:', alertsArray);
+          */
+          // New API calls
+          const SupportApi = (await import('../api/SupportApi')).default;
+          const [res1, res2] = await Promise.all([
+            SupportApi.getAllPriorities(),
+            SupportApi.getAllAlerts()
+          ]);
+          const priorityArray = Array.isArray(res1.data?.data) ? res1.data.data : [];
+          const alertsArray = Array.isArray(res2.data?.data) ? res2.data.data : [];
           const all = [...priorityArray, ...alertsArray];
           setNotifications(all);
         } catch (err) {

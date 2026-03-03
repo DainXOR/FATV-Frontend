@@ -48,6 +48,8 @@ const TutoringHistoryView = () => {
   const fetchSessionTypes = async () => {
     try {
       const token = localStorage.getItem('token');
+      // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/session-types/all`,
         {
@@ -57,8 +59,14 @@ const TutoringHistoryView = () => {
         }
       );
       const sessionTypesData = response.data.data || [];
+      */
+      // New API call
+      const SupportApi = (await import('../api/SupportApi')).default;
+      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      const response = await SupportApi.getSessionTypes();
+      const sessionTypesData = response.data?.data || [];
       setSessionTypes(sessionTypesData);
-      return sessionTypesData; // Retornamos los datos para uso inmediato
+      return sessionTypesData;
     } catch (error) {
       console.error('Error al cargar tipos de sesión:', error);
       const fallbackSessionTypes = [
@@ -80,8 +88,8 @@ const TutoringHistoryView = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-
-      // Cargar todas las sesiones sin paginación
+      // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v1/session/all`,
         {
@@ -90,32 +98,27 @@ const TutoringHistoryView = () => {
           },
         }
       );
-
       const sessionsData = Array.isArray(response.data) ? response.data : response.data.data || [];
-      
-      console.log('Sesiones recibidas:', sessionsData.slice(0, 2)); 
-      
-      const mappedSessions = sessionsData.map(session => {
-
-        console.log('Session notes field:', session.session_notes);
-        
-        return {
-          ...session,
-          first_name: session.name || 'N/A',
-          last_name: session.surname || 'N/A',
-          first_name_companion: session.companion_name || 'N/A',
-          last_name_companion: session.companion_surname || 'N/A',
-          companion_specialty: session.companion_speciality || 'N/A',
-          session_type_name: session.session_type_name ||
-            sessionTypesArray.find(type => type.id === session.id_session_type)?.name || 'No definido',
-          notes: session.session_notes || 'Sin notas', 
-          status: session.status || 'Pendiente'
-        };
-      });
-
+      */
+      // New API call
+      const SupportApi = (await import('../api/SupportApi')).default;
+      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      const response = await SupportApi.getAllSessions();
+      const sessionsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+      const mappedSessions = sessionsData.map(session => ({
+        ...session,
+        first_name: session.name || 'N/A',
+        last_name: session.surname || 'N/A',
+        first_name_companion: session.companion_name || 'N/A',
+        last_name_companion: session.companion_surname || 'N/A',
+        companion_specialty: session.companion_speciality || 'N/A',
+        session_type_name: session.session_type_name ||
+          sessionTypesArray.find(type => type.id === session.id_session_type)?.name || 'No definido',
+        notes: session.session_notes || 'Sin notas', 
+        status: session.status || 'Pendiente'
+      }));
       setSessions(mappedSessions);
       setFilteredSessions(mappedSessions);
-
     } catch (err) {
       console.error('Error al cargar sesiones:', err);
       setError(err.message);
@@ -169,6 +172,8 @@ const TutoringHistoryView = () => {
   const updateSessionStatus = async (sessionId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
+      // Old axios call (commented for reference)
+      /*
       const response = await axios.patch(
         `${process.env.REACT_APP_BACKEND_URL}/api/v1/session/${sessionId}`,
         { status: newStatus },
@@ -178,13 +183,16 @@ const TutoringHistoryView = () => {
           },
         }
       );
-
+      */
+      // New API call
+      const SupportApi = (await import('../api/SupportApi')).default;
+      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      const response = await SupportApi.updateSessionStatus(sessionId, newStatus);
       // Actualizar el estado local
       const updatedSessions = sessions.map((session) =>
         session.id === sessionId ? { ...session, status: newStatus } : session
       );
       setSessions(updatedSessions);
-
       Swal.fire({
         title: 'Éxito',
         text: 'Estado actualizado correctamente',
@@ -192,7 +200,6 @@ const TutoringHistoryView = () => {
         timer: 2000,
         showConfirmButton: false
       });
-
     } catch (error) {
       console.error('Error al actualizar estado:', error);
       Swal.fire({
@@ -229,7 +236,8 @@ const TutoringHistoryView = () => {
     try {
       setLoadingStats(true);
       const token = localStorage.getItem('token');
-
+      // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/sessions/student/${studentId}`,
         {
@@ -238,29 +246,29 @@ const TutoringHistoryView = () => {
           },
         }
       );
-
       const studentSessions = response.data.data || [];
-
+      */
+      // New API call
+      const SupportApi = (await import('../api/SupportApi')).default;
+      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      const response = await SupportApi.getStudentSessions(studentId);
+      const studentSessions = response.data?.data || [];
       const statsMap = {};
       studentSessions.forEach(session => {
         const sessionTypeName = sessionTypes.find(type => type.id === session.id_session_type)?.name || 'No definido';
-
         if (statsMap[sessionTypeName]) {
           statsMap[sessionTypeName]++;
         } else {
           statsMap[sessionTypeName] = 1;
         }
       });
-
       const statsArray = Object.entries(statsMap)
         .map(([name, count]) => ({
           session_type: name,
           total_sessions: count
         }))
         .sort((a, b) => b.total_sessions - a.total_sessions);
-
       setStudentStats(statsArray);
-
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
       Swal.fire({

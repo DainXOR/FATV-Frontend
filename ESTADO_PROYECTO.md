@@ -8,7 +8,7 @@
   - Formulario de registro y edición de estudiantes (App.js, StudentForm.js).
   - Listado y edición de estudiantes (StudentTable.js).
 - **Acompañamientos:**
-  - Agregar acompañamientos a estudiantes (AgregarAcompanamiento.js).
+  - Agregar acompañamientos a estudiantes (AgregarAcompanamiento.js). -- Listo
 - **Historial y filtros:**
   - Visualización de historial de tutorías y filtros por mes (TutoringHistoryView.js, HistorialAsesorias.js).
 - **Creación de formularios:**
@@ -17,7 +17,7 @@
 - **Notificaciones:**
   - Centro de notificaciones básico (NotificationCenter.js).
 - **Selector de mes:**
-  - Componente reutilizable para seleccionar meses (MonthPicker.js).
+  - Componente reutilizable para seleccionar meses (MonthPicker.js). -- Listo
 
 ---
 
@@ -36,14 +36,14 @@
 ## 🔴 Funcionalidades Faltantes o Incompletas
 
 - **Autenticación y control de acceso:**
-  - No hay login ni manejo centralizado de roles.
+  - No hay login ni manejo centralizado de roles. -- Revisar
   - El usuario es hardcodeado en App.js.
 - **Ruteo:**
-  - No se usa react-router-dom para rutas; se parsea window.location.pathname manualmente.
+  - No se usa react-router-dom para rutas; se parsea window.location.pathname manualmente. -- Listo
 - **Cliente API centralizado:**
-  - No existe un helper de axios para manejar tokens y errores de forma uniforme.
+  - No existe un helper de axios para manejar tokens y errores de forma uniforme. -- En progreso
 - **Reportes y dashboards:**
-  - No hay gráficos ni reportes implementados, aunque se menciona en los HUs.
+  - No hay gráficos ni reportes implementados, aunque se menciona en los HUs. 
 - **Alertas y sistema de riesgo:**
   - No hay lógica de generación automática de alertas o scoring de riesgo.
 - **Validaciones y accesibilidad:**
@@ -56,17 +56,17 @@
 ## ⚠️ Problemas Detectados y Riesgos
 
 - **IDs hardcodeados:**
-  - Muchos componentes usan IDs fijos de la base de datos (tipos de sesión, vulnerabilidad, universidades, etc). Esto dificulta el despliegue en otros entornos.
+  - Muchos componentes usan IDs fijos de la base de datos (tipos de sesión, vulnerabilidad, universidades, etc). Esto dificulta el despliegue en otros entornos. -- Falta
 - **Inconsistencia en el token:**
   - Algunos usan 'jwt', otros 'token' en localStorage. Puede causar fallos de autenticación.
 - **Llamadas API inconsistentes:**
-  - Mezcla de endpoints v1/v2 y headers incompletos.
+  - Mezcla de endpoints v1/v2 y headers incompletos. -- Listo
 - **Fragilidad en el parseo de formularios:**
-  - Si el backend cambia, el frontend puede fallar silenciosamente.
+  - Si el backend cambia, el frontend puede fallar silenciosamente. -- Faltan pruebas
 - **Manejo de fechas y horas:**
-  - Formateo y parseo ad-hoc, riesgo de bugs por zona horaria.
+  - Formateo y parseo ad-hoc, riesgo de bugs por zona horaria. -- Falta
 - **Activos estáticos:**
-  - Imágenes referenciadas pueden faltar y romper la UI.
+  - Imágenes referenciadas pueden faltar y romper la UI. -- Revisar
 
 ---
 

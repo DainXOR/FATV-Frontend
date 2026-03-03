@@ -1,23 +1,18 @@
-import ApiClient from './ApiClient';
+import { ApiBase } from "./ApiBase.js";
 
-const STUDENTS_ENDPOINT = 'student/';
+/**
+ * @typedef {import("../Models/StudentModels.js").StudentRequest} RequestModel
+ * @typedef {import("../Models/StudentModels.js").StudentResult} ResultModel
+ */
 
-const StudentsApi = {
-    createStudent: async (data) => {
-        return ApiClient.post(STUDENTS_ENDPOINT, data);
-    },
-    getStudent: async (id) => {
-        return ApiClient.get(`${STUDENTS_ENDPOINT}${id}/`);
-    },
-    updateStudent: async (id, data) => {
-        return ApiClient.put(`${STUDENTS_ENDPOINT}${id}/`, data);
-    },
-    deleteStudent: async (id) => {
-        return ApiClient.delete(`${STUDENTS_ENDPOINT}${id}/`);
-    },
-    listStudents: async () => {
-        return ApiClient.get(STUDENTS_ENDPOINT);
+/**
+ * @extends ApiBase<RequestModel,ResultModel>
+ */
+class StudentsApi extends ApiBase {
+    constructor() {
+        super("students");
     }
-};
+}
 
-export default StudentsApi;
+const api = new StudentsApi();
+export default api;

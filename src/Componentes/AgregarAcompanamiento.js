@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import StudentsApi from "../api/StudentsApi";
+import CompanionsApi from "../api/CompanionsApi";
+import SessionsApi from "../api/SessionsApi";
 import Swal from 'sweetalert2';
 import '../Estilos/Acompanamiento.css';
+import { expectOk } from "../utils/types";
+import ApiClient from "../api/ApiClient";
 
 const AgregarAcompanamiento = () => {
   const [formData, setFormData] = useState({
@@ -26,13 +30,16 @@ const AgregarAcompanamiento = () => {
   const studentInputRef = useRef(null);
 
   // Estados para listas
+  /** @type {[import("../Models/StudentModels").StudentResult[], Function]} */
   const [students, setStudents] = useState([]);
+  /** @type {[import("../Models/CompanionModels").CompanionResult[], Function]} */
   const [companions, setCompanions] = useState([]);
+  /** @type {[import("../Models/SessionModels").SessionResult[], Function]} */
   const [sessionTypes, setSessionTypes] = useState([]);
 
   const fetchStudents = async () => {
-    try {
-      const token = localStorage.getItem('token');
+    // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`,
         {
@@ -41,22 +48,27 @@ const AgregarAcompanamiento = () => {
           }
         }
       );
-      const filteredStudents = (response.data.data || []).map(student => ({
+      */
+    // New API call
+    const response = await StudentsApi.getAll();
+    if (response.ok) {
+      const filteredStudents = response.data.map(student => ({
         id: student.id,
         first_name: student.first_name,
         last_name: student.last_name,
         fullName: `${student.first_name} ${student.last_name}`
       }));
       setStudents(filteredStudents);
-    } catch (error) {
-      console.error('Error fetching students:', error);
+      
+    } else {
+      console.error(response.error)
       Swal.fire({ title: 'Error', text: 'Error al cargar la lista de estudiantes', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
     }
   };
 
   const fetchCompanions = async () => {
-    try {
-      const token = localStorage.getItem('token');
+    // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/companions/all`,
         {
@@ -65,21 +77,27 @@ const AgregarAcompanamiento = () => {
           },
         }
       );
-      const filteredCompanions = (response.data.data || []).map(companion => ({
+      */
+    // New API call
+      
+    const response = await CompanionsApi.getAll();
+    if (response.ok) {
+      const filteredCompanions = response.data.map(companion => ({
         id: companion.id,
         first_name: companion.first_name,
         last_name: companion.last_name
       }));
       setCompanions(filteredCompanions);
-    } catch (error) {
-      console.error('Error fetching companions:', error);
-      Swal.fire({ title: 'Error', text: 'Error al cargar la lista de profesionales', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
+      
+    } else {
+      console.error('Error fetching companions:', response.error);
+    Swal.fire({ title: 'Error', text: 'Error al cargar la lista de profesionales', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
     }
   };
 
   const fetchSessionTypes = async () => {
-    try {
-      const token = localStorage.getItem('token');
+    // Old axios call (commented for reference)
+      /*
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/session-types/all`,
         {
@@ -88,13 +106,18 @@ const AgregarAcompanamiento = () => {
           },
         }
       );
-      const filteredSessionTypes = (response.data.data || []).map(sessionType => ({
-        id: sessionType._id || sessionType.id,
+      */
+    // New API call
+    const response = await SessionsApi.Types().getAll();
+    if (response.ok) {
+      const filteredCompanions = response.data.map(sessionType => ({
+        id: sessionType.id,
         name: sessionType.name
       }));
-      setSessionTypes(filteredSessionTypes);
-    } catch (error) {
-      console.error('Error fetching session types:', error);
+      setCompanions(filteredCompanions);
+      
+    } else {
+      console.error('Error fetching session types:', response.error);
       const fallbackSessionTypes = [
         { id: '686090b367343360f5acecaa', name: 'Asesoría Sociopedagógica (ASP)' },
         { id: '686090d467343360f5acecab', name: 'Tutoría' },
@@ -110,13 +133,13 @@ const AgregarAcompanamiento = () => {
 
 
   // Función para filtrar estudiantes basado en la búsqueda
-const handleStudentInputChange = (e) => {
+const handleStudentInputChange = (/** @type {{ target: { value: any; }; }} */ e) => {
   const query = e.target.value;
   setStudentQuery(query);
 
   if (query.length > 0) {
     const filtered = students.filter(student =>
-      student.fullName.toLowerCase().includes(query.toLowerCase()) ||
+      `${student.first_name} ${student.last_name}`.toLowerCase().includes(query.toLowerCase()) ||
       student.first_name.toLowerCase().includes(query.toLowerCase()) ||
       student.last_name.toLowerCase().includes(query.toLowerCase())
     );
@@ -131,7 +154,7 @@ const handleStudentInputChange = (e) => {
 };
 
   // Función para seleccionar un estudiante
-  const handleStudentSelect = (student) => {
+  const handleStudentSelect = (/** @type {React.SetStateAction<null>} */ student) => {
     setSelectedStudent(student);
     setStudentQuery(student.fullName);
     setShowStudentDropdown(false);
@@ -139,13 +162,13 @@ const handleStudentInputChange = (e) => {
   };
 
   // Función para manejar el clic fuera del dropdown
-  const handleClickOutside = (event) => {
+  const handleClickOutside = (/** @type {{ target: any; }} */ event) => {
     if (studentInputRef.current && !studentInputRef.current.contains(event.target)) {
       setShowStudentDropdown(false);
     }
   };
 
-  const handleObservacionesChange = (e) => {
+  const handleObservacionesChange = (/** @type {{ target: { value: any; }; }} */ e) => {
   setFormData(prev => ({ ...prev, observaciones: e.target.value }));
 };
 
@@ -157,7 +180,7 @@ const handleStudentInputChange = (e) => {
     };
   }, []);
 
-  const handleChange = (e) => {
+  const handleChange = (/** @type {{ target: { name: any; value: any; }; }} */ e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -205,14 +228,14 @@ const handleStudentInputChange = (e) => {
   };
 
   // --- Manejadores de cambio para los nuevos dropdowns ---
-  const handleDayChange = (e) => setSelectedDay(e.target.value);
-  const handleMonthChange = (e) => setSelectedMonth(e.target.value);
-  const handleYearChange = (e) => setSelectedYear(e.target.value);
-  const handleHourChange = (e) => setSelectedHour(e.target.value);
-  const handleMinuteChange = (e) => setSelectedMinute(e.target.value);
+  const handleDayChange = (/** @type {{ target: { value: React.SetStateAction<string>; }; }} */ e) => setSelectedDay(e.target.value);
+  const handleMonthChange = (/** @type {{ target: { value: React.SetStateAction<string>; }; }} */ e) => setSelectedMonth(e.target.value);
+  const handleYearChange = (/** @type {{ target: { value: React.SetStateAction<string>; }; }} */ e) => setSelectedYear(e.target.value);
+  const handleHourChange = (/** @type {{ target: { value: React.SetStateAction<string>; }; }} */ e) => setSelectedHour(e.target.value);
+  const handleMinuteChange = (/** @type {{ target: { value: React.SetStateAction<string>; }; }} */ e) => setSelectedMinute(e.target.value);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-const handleSubmit = async (e) => {
+const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) => {
   e.preventDefault();
   // Prevenir múltiples envíos
   if (isSubmitting) {
@@ -262,19 +285,8 @@ const handleSubmit = async (e) => {
 
     try {
       const token = localStorage.getItem('token');
-
-      const backendData = {
-        id_student: formData.estudiante,
-        id_companion: formData.profesional,
-        id_session_type: formData.tipo,
-        notes: formData.observaciones,
-        date: `${fullDate}T${fullTime}:00`, 
-        id_vulnerability_type: "685c2d33d96df17161191887",
-        id_contact_reason:"693305b68d375622ce1f0487",
-      };
-
-      console.log('Datos enviados al backend:', backendData);
-
+      // Old axios call (commented for reference)
+      /*
       const response = await axios.post(
         `${process.env.REACT_APP_BACKEND_URL}/api/v2/sessions/`,
         backendData,
@@ -285,9 +297,22 @@ const handleSubmit = async (e) => {
           }
         }
       );
-
+      */
+      // New API call
+      const SupportApi = (await import('../api/SupportApi')).default;
+      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      const backendData = {
+        id_student: formData.estudiante,
+        id_companion: formData.profesional,
+        id_session_type: formData.tipo,
+        notes: formData.observaciones,
+        date: `${fullDate}T${fullTime}:00`, 
+        id_vulnerability_type: "685c2d33d96df17161191887",
+        id_contact_reason:"693305b68d375622ce1f0487",
+      };
+      console.log('Datos enviados al backend:', backendData);
+      const response = await SupportApi.createSession(backendData);
       console.log('Sesión creada:', response.data);
-
       // Alerta de éxito
       Swal.fire({
         title: '¡Éxito!',
@@ -296,7 +321,6 @@ const handleSubmit = async (e) => {
         confirmButtonText: 'Aceptar',
         confirmButtonColor: '#28a745'
       });
-
       // Limpiar el formulario después de enviar exitosamente
       setFormData({
         estudiante: '',

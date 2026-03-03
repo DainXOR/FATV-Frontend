@@ -21,9 +21,10 @@ import FormCreatorPage from './pages/FormCreatorPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
+import { config } from "./utils/config";
 
 /*El back debe regresar en esta sección el nombre y rol de la persona que ingresó. De momento, se hace de forma local */
-console.log("Back url: " + process.env.REACT_APP_BACKEND_URL)
+console.log("Back url: " + config.backendUrl)
 
 // Dashboard main page (empty for now, shows available menus)
 const DashboardHome = () => (

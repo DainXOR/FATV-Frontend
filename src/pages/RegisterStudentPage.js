@@ -67,6 +67,8 @@ const RegisterStudentPage = ({ user }) => {
             id_university: id_university
         };
         try {
+            // Old axios call (commented for reference)
+            /*
             const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/v1/student/`, 
                 dataToSend, 
                 {
@@ -76,6 +78,11 @@ const RegisterStudentPage = ({ user }) => {
                     }
                 }
             );
+            */
+            // New API call
+            const StudentsApi = (await import('../api/StudentsApi')).default;
+            StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
+            const response = await StudentsApi.registerStudent(dataToSend);
             console.log('JWT Token:', token);
             console.log('User created successfully:', response.data);
             Swal.fire({

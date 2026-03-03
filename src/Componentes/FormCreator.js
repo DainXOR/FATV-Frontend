@@ -246,6 +246,8 @@ const buildQuestionsPayload = () => {
     const fetchStudents = async () => {
       try {
         const token = localStorage.getItem('token');
+        // Old axios call (commented for reference)
+        /*
         const response = await axios.get(
           `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`,
           {
@@ -254,6 +256,12 @@ const buildQuestionsPayload = () => {
             }
           }
         );
+        const raw = response.data?.data || [];
+        */
+        // New API call
+        const StudentsApi = (await import('../api/StudentsApi')).default;
+        StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
+        const response = await StudentsApi.getAllStudents();
         const raw = response.data?.data || [];
         const list = (raw || []).map(student => ({
           id: student.id || student._id || student.number_id || Math.random().toString(36).slice(2,9),
@@ -277,23 +285,25 @@ const buildQuestionsPayload = () => {
     const fetchQuestions = async () => {
       try {
         const token = localStorage.getItem('token');
-
+        // Old axios call (commented for reference)
+        /*
         const response = await axios.get(
           `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/all`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
         );
-
-        console.log("RESPUESTA COMPLETA DEL BACK:", response.data);
-
         const list = response.data?.data;
-
+        */
+        // New API call
+        const FormApi = (await import('../api/FormApi')).default;
+        FormApi.setAuthToken && FormApi.setAuthToken(token);
+        const response = await FormApi.listQuestions ? await FormApi.listQuestions() : await FormApi.listForms();
+        const list = response.data?.data;
         if (!Array.isArray(list)) {
           console.error("El backend NO devolvió una lista en 'data'");
           return;
         }
-
         const loaded = list.map(q => ({
           id: q.id,
           text: q.question,             
@@ -301,9 +311,7 @@ const buildQuestionsPayload = () => {
           options: q.options || [],   
           type: mapTypeToBackend(q.id_question_type)
         }));
-
         setQuestions(loaded);
-
       } catch (err) {
         console.error("Error cargando preguntas:", err);
         Swal.fire({
@@ -314,7 +322,6 @@ const buildQuestionsPayload = () => {
         });
       }
     };
-
     fetchQuestions();
   }, []);
 

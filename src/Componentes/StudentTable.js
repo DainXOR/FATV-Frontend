@@ -53,7 +53,14 @@ const StudentTable = ({ onNavigateToProfile }) => {
     useEffect(() => {
         const fetchStudents = async () => {
             try {
+                // Old axios call (commented for reference)
+                /*
                 const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`);
+                const studentsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+                */
+                // New API call
+                const StudentsApi = (await import('../api/StudentsApi')).default;
+                const response = await StudentsApi.getAllStudents();
                 const studentsData = Array.isArray(response.data) ? response.data : response.data.data || [];
                 setStudents(studentsData);
                 setFilteredStudents(studentsData);
@@ -101,6 +108,8 @@ const StudentTable = ({ onNavigateToProfile }) => {
     const handleSave = async () => {
         try {
             const token = localStorage.getItem('token');
+            // Old axios call (commented for reference)
+            /*
             await axios.patch(
                 `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/${editingStudent}`,
                 formData,
@@ -111,11 +120,14 @@ const StudentTable = ({ onNavigateToProfile }) => {
                     }
                 }
             );
-
+            */
+            // New API call
+            const StudentsApi = (await import('../api/StudentsApi')).default;
+            StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
+            await StudentsApi.updateStudent(editingStudent, formData);
             const updatedStudents = students.map((student) =>
                 student.id === editingStudent ? { ...student, ...formData } : student
             );
-
             setStudents(updatedStudents);
             setEditingStudent(null);
             Swal.fire({
