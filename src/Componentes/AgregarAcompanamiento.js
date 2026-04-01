@@ -403,7 +403,7 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
         </div>
 
         <label>Tipo de acompañamiento:<span className="required-asterisk">*</span></label>
-        <select name="tipo" value={formData.type} onChange={handleChange} required>
+        <select name="type" value={formData.type} onChange={handleChange} required>
           <option value="">Seleccione...</option>
           {sessionTypes.length > 0 ? (
             sessionTypes.map((sessionType) => (
@@ -418,7 +418,7 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
 
         <label>Profesional responsable: <span className="required-asterisk">*</span></label>
         <select
-          name="profesional"
+          name="professional"
           value={formData.professional}
           onChange={handleChange}
           required
