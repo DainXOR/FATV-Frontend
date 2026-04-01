@@ -4,15 +4,30 @@ import CompanionsApi from "../api/CompanionsApi";
 import SessionsApi from "../api/SessionsApi";
 import Swal from 'sweetalert2';
 import '../Estilos/Acompanamiento.css';
-import { expectOk } from "../utils/types";
-import ApiClient from "../api/ApiClient";
+import { SessionStatus } from "../Models/SessionModels";
+
+/**
+ * @typedef {import("../Models/StudentModels").StudentResult} StudentResult
+ * @typedef {import("../Models/CompanionModels").CompanionResult} CompanionResult
+ * @typedef {import("../Models/SessionModels").SessionResult} SessionResult
+ * @typedef {import("../Models/SessionModels").SessionRequest} SessionRequest
+*/
+
+/**
+ * @typedef {Object} FormData
+ * @property {string} student
+ * @property {string} type
+ * @property {string} professional
+ * @property {string} observations
+*/
 
 const AgregarAcompanamiento = () => {
+  /** @type {[FormData, React.Dispatch<React.SetStateAction<FormData>>]} */
   const [formData, setFormData] = useState({
-    estudiante: '',
-    tipo: '',
-    profesional: '',
-    observaciones: '',
+    student: '',
+    type: '',
+    professional: '',
+    observations: '',
   });
 
   // NUEVOS ESTADOS PARA FECHA Y HORA EN DROPDOWNS
@@ -24,153 +39,127 @@ const AgregarAcompanamiento = () => {
 
   // Estados para el autocompletado de estudiantes
   const [studentQuery, setStudentQuery] = useState('');
-  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [filteredStudents, setFilteredStudents] = useState(/** @type StudentResult[] */([]));
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const studentInputRef = useRef(null);
+  const [selectedStudent, setSelectedStudent] = useState(/** @type StudentResult|null */(null));
+  const studentInputRef = useRef(/** @type HTMLDivElement|null */(null));
 
   // Estados para listas
-  /** @type {[import("../Models/StudentModels").StudentResult[], Function]} */
+  /** @type {[StudentResult[], Function]} */
   const [students, setStudents] = useState([]);
-  /** @type {[import("../Models/CompanionModels").CompanionResult[], Function]} */
+  /** @type {[CompanionResult[], Function]} */
   const [companions, setCompanions] = useState([]);
-  /** @type {[import("../Models/SessionModels").SessionResult[], Function]} */
+  /** @type {[SessionResult[], Function]} */
   const [sessionTypes, setSessionTypes] = useState([]);
 
+  /**
+   * Fetch all students from API and map to StudentResult[]
+   * @returns {Promise<void>}
+   */
   const fetchStudents = async () => {
-    // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          }
-        }
-      );
-      */
-    // New API call
-    const response = await StudentsApi.getAll();
-    if (response.ok) {
-      const filteredStudents = response.data.map(student => ({
-        id: student.id,
-        first_name: student.first_name,
-        last_name: student.last_name,
+    try {
+      const response = await StudentsApi.getAll();
+      if (!response.ok) throw new Error(response.error.message || 'Students API error');
+      
+      console.log('Raw response body from API:', response.body);
+      console.log('Raw students data from API:', response.body.data);
+      const mapped = response.body.data.map(student => ({
+        ...student,
         fullName: `${student.first_name} ${student.last_name}`
       }));
-      setStudents(filteredStudents);
-      
-    } else {
-      console.error(response.error)
+      setStudents(mapped);
+
+    } catch (error) {
+      console.error('Error fetching students:', error);
       Swal.fire({ title: 'Error', text: 'Error al cargar la lista de estudiantes', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
     }
   };
 
+  /**
+   * Fetch all companions from API and map to CompanionResult[]
+   * @returns {Promise<void>}
+   */
   const fetchCompanions = async () => {
-    // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/companions/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      */
-    // New API call
-      
-    const response = await CompanionsApi.getAll();
-    if (response.ok) {
-      const filteredCompanions = response.data.map(companion => ({
-        id: companion.id,
-        first_name: companion.first_name,
-        last_name: companion.last_name
-      }));
-      setCompanions(filteredCompanions);
-      
-    } else {
-      console.error('Error fetching companions:', response.error);
-    Swal.fire({ title: 'Error', text: 'Error al cargar la lista de profesionales', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
+    try {
+      const response = await CompanionsApi.getAll();
+      if (!response.ok) throw new Error(response.error.message || 'Companions API error');
+      setCompanions(response.body.data);
+
+    } catch (error) {
+      console.error('Error fetching companions:', error);
+      Swal.fire({ title: 'Error', text: 'Error al cargar la lista de profesionales', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
     }
   };
 
+  /**
+   * Fetch all session types from API and map to SessionResult[]
+   * @returns {Promise<void>}
+   */
   const fetchSessionTypes = async () => {
-    // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/session-types/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      */
-    // New API call
-    const response = await SessionsApi.Types().getAll();
-    if (response.ok) {
-      const filteredCompanions = response.data.map(sessionType => ({
-        id: sessionType.id,
-        name: sessionType.name
-      }));
-      setCompanions(filteredCompanions);
-      
-    } else {
-      console.error('Error fetching session types:', response.error);
-      const fallbackSessionTypes = [
-        { id: '686090b367343360f5acecaa', name: 'Asesoría Sociopedagógica (ASP)' },
-        { id: '686090d467343360f5acecab', name: 'Tutoría' },
-        { id: '686090df67343360f5acecac', name: 'Grupo de estudio' },
-        { id: '686090f367343360f5acecad', name: 'Taller socioemocional' },
-        { id: '6860912167343360f5acecae', name: 'Psicorientación' },
-        { id: '6860912c67343360f5acecaf', name: 'Orientación sociofamiliar' },
-        { id: '6860913867343360f5acecb0', name: 'Orientación a Bienestar' }
-      ];
-      setSessionTypes(fallbackSessionTypes);
+    try {
+      const response = await SessionsApi.Types().getAll();
+      if (!response.ok) throw new Error(response.error.message || 'Sessions API error');
+      setSessionTypes(response.body.data);
+
+    } catch (error) {
+      console.error('Error fetching session types:', error);
+      Swal.fire({ title: 'Error', text: 'Error al cargar los tipos de sesión', icon: 'error', confirmButtonText: 'Aceptar', confirmButtonColor: '#d33' });
     }
   };
 
 
-  // Función para filtrar estudiantes basado en la búsqueda
-const handleStudentInputChange = (/** @type {{ target: { value: any; }; }} */ e) => {
-  const query = e.target.value;
-  setStudentQuery(query);
+  /**
+   * Handles input change for student autocomplete
+   * @param {React.ChangeEvent<HTMLInputElement>} e
+   */
+  const handleStudentInputChange = (e) => {
+    const query = e.target.value;
+    setStudentQuery(query);
+    if (query.length > 0) {
+      const filtered = students.filter(student =>
+        `${student.first_name} ${student.last_name}`.toLowerCase().includes(query.toLowerCase()) ||
+        student.first_name.toLowerCase().includes(query.toLowerCase()) ||
+        student.last_name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredStudents(filtered);
+      setShowStudentDropdown(true);
+    } else {
+      setFilteredStudents([]);
+      setShowStudentDropdown(false);
+      setSelectedStudent(null);
+      setFormData(prev => ({ ...prev, student: '' }));
+    }
+  };
 
-  if (query.length > 0) {
-    const filtered = students.filter(student =>
-      `${student.first_name} ${student.last_name}`.toLowerCase().includes(query.toLowerCase()) ||
-      student.first_name.toLowerCase().includes(query.toLowerCase()) ||
-      student.last_name.toLowerCase().includes(query.toLowerCase())
-    );
-    setFilteredStudents(filtered);
-    setShowStudentDropdown(true);
-  } else {
-    setFilteredStudents([]);
-    setShowStudentDropdown(false);
-    setSelectedStudent(null);
-    setFormData(prev => ({ ...prev, estudiante: '' }));
-  }
-};
-
-  // Función para seleccionar un estudiante
-  const handleStudentSelect = (/** @type {React.SetStateAction<null>} */ student) => {
+  /**
+   * Handles selecting a student from autocomplete
+   * @param {StudentResult} student
+   */
+  const handleStudentSelect = (student) => {
+    if (!student) return;
     setSelectedStudent(student);
-    setStudentQuery(student.fullName);
+    setStudentQuery(`${student.first_name} ${student.last_name}`);
     setShowStudentDropdown(false);
-    setFormData(prev => ({ ...prev, estudiante: student.id }));
+    setFormData(prev => ({ ...prev, student: student.id }));
   };
 
   // Función para manejar el clic fuera del dropdown
-  const handleClickOutside = (/** @type {{ target: any; }} */ event) => {
-    if (studentInputRef.current && !studentInputRef.current.contains(event.target)) {
+  /**
+   * @param {MouseEvent} event
+   */
+  const handleClickOutside = (event) => {
+    if (studentInputRef.current && event.target instanceof Element && !studentInputRef.current.contains(event.target)) {
       setShowStudentDropdown(false);
     }
   };
 
-  const handleObservacionesChange = (/** @type {{ target: { value: any; }; }} */ e) => {
-  setFormData(prev => ({ ...prev, observaciones: e.target.value }));
-};
+  /**
+   * Handles change for observations textarea
+   * @param {React.ChangeEvent<HTMLTextAreaElement>} e
+   */
+  const handleObservacionesChange = (e) => {
+    setFormData(prev => ({ ...prev, observations: e.target.value }));
+  };
 
   // Effect para manejar clics fuera del componente
   useEffect(() => {
@@ -284,35 +273,26 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
     setIsSubmitting(true); //Se deshabilita el botón para evitar múltiples envíos
 
     try {
-      const token = localStorage.getItem('token');
-      // Old axios call (commented for reference)
-      /*
-      const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/sessions/`,
-        backendData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      */
-      // New API call
-      const SupportApi = (await import('../api/SupportApi')).default;
-      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+      //const token = localStorage.getItem('token');
+      // Use new API layer for support session creation
+      //const SupportApi = (await import('../api/SupportApi')).default;
+      //if (SupportApi.setAuthToken) SupportApi.setAuthToken(token);
+      /** @type {SessionRequest} */
       const backendData = {
-        id_student: formData.estudiante,
-        id_companion: formData.profesional,
-        id_session_type: formData.tipo,
-        notes: formData.observaciones,
-        date: `${fullDate}T${fullTime}:00`, 
-        id_vulnerability_type: "685c2d33d96df17161191887",
-        id_contact_reason:"693305b68d375622ce1f0487",
+        id_student: formData.student,
+        id_companion: formData.professional,
+        id_session_type: formData.type,
+        session_notes: formData.observations,
+        id_vulnerability_type: "",
+        id_contact_reason: "",
+        status: SessionStatus.PENDING,
+        date: `${fullDate}T${fullTime}:00`,
       };
+      // Remove undefined keys
+      //const cleanedBackendData = Object.fromEntries(Object.entries(backendData).filter(([_, v]) => v !== undefined));
       console.log('Datos enviados al backend:', backendData);
-      const response = await SupportApi.createSession(backendData);
-      console.log('Sesión creada:', response.data);
+      const response = await SessionsApi.create(backendData);
+      if (!response.ok) throw new Error('No se pudo crear el acompañamiento: ' + response.error.message);
       // Alerta de éxito
       Swal.fire({
         title: '¡Éxito!',
@@ -323,10 +303,10 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
       });
       // Limpiar el formulario después de enviar exitosamente
       setFormData({
-        estudiante: '',
-        tipo: '',
-        profesional: '',
-        observaciones: '',
+        student: '',
+        type: '',
+        professional: '',
+        observations: '',
       });
       setStudentQuery('');
       setSelectedStudent(null);
@@ -337,14 +317,11 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
       setSelectedYear('');
       setSelectedHour('');
       setSelectedMinute('');
-
-    } catch (error) {
-      console.error('Error:', error);
-      console.error('Error details:', error.response?.data);
-
+    } catch (/** @type {any} */ error) {
+      console.error('Error creating session:', error);
       Swal.fire({
         title: 'Error',
-        text: error.response?.data?.message || 'Error al registrar el acompañamiento',
+        text: error?.message || 'Error al registrar el acompañamiento',
         icon: 'error',
         confirmButtonText: 'Aceptar',
         confirmButtonColor: '#d33'
@@ -404,14 +381,14 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
                     borderBottom: '1px solid #eee',
                     backgroundColor: '#fff'
                   }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f0f0f0';
+                  onMouseEnter={(/** @type {React.MouseEvent<HTMLDivElement>} */ e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f0';
                   }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#fff';
+                  onMouseLeave={(/** @type {React.MouseEvent<HTMLDivElement>} */ e) => {
+                    e.currentTarget.style.backgroundColor = '#fff';
                   }}
                 >
-                  {student.fullName}
+                  {student.first_name} {student.last_name}
                 </div>
               ))}
             </div>
@@ -426,7 +403,7 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
         </div>
 
         <label>Tipo de acompañamiento:<span className="required-asterisk">*</span></label>
-        <select name="tipo" value={formData.tipo} onChange={handleChange} required>
+        <select name="type" value={formData.type} onChange={handleChange} required>
           <option value="">Seleccione...</option>
           {sessionTypes.length > 0 ? (
             sessionTypes.map((sessionType) => (
@@ -441,8 +418,8 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
 
         <label>Profesional responsable: <span className="required-asterisk">*</span></label>
         <select
-          name="profesional"
-          value={formData.profesional}
+          name="professional"
+          value={formData.professional}
           onChange={handleChange}
           required
           style={{ minHeight: '40px', padding: '20px' }}
@@ -500,9 +477,9 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
         <label>Observaciones:</label>
         <textarea
           name="observaciones"
-          value={formData.observaciones}
+          value={formData.observations}
           onChange={handleObservacionesChange} 
-          rows="4"
+          rows={4}
           className="observaciones-textarea"
           placeholder="Ingresa las observaciones del acompañamiento..."
         />

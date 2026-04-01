@@ -24,7 +24,7 @@ export class Api {
     #token;
 
     constructor({
-        apiUrl = config.backendUrl,
+        apiUrl = config.backendUrl + "/api",
         defaultRouteVersion = config.apiRouteVersion,
         token = null
     } = {}) {
@@ -280,7 +280,7 @@ export class Api {
             return {
                 ok: true,
                 status: response.status,
-                data: response.data,
+                body: response.data,
                 headers: this.#normalizeAxiosHeaders(response.headers),
                 rawHeaders: response.headers
             };

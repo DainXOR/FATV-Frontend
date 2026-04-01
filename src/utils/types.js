@@ -12,10 +12,18 @@
 
 /**
  * @template T
+ * @typedef {Object} ApiResultBody
+ * @property {T} data
+ * @property {string} message
+ * @property {any} extra
+ */
+
+/**
+ * @template T
  * @typedef {Object} ApiResultOk
  * @property {true} ok
  * @property {number} status
- * @property {T} data
+ * @property {ApiResultBody<T>} body
  * @property {Record<string, string>} headers
  * @property {import("axios").AxiosResponseHeaders | Partial<Record<string, any>>} rawHeaders
  */

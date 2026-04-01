@@ -1,7 +1,14 @@
 //---------------------- Common Definitions ---------------------//
-/**
- * @typedef {"Desconocido"|"Pendiente"|"Completado"|"Cancelado"|"No asistió"} SessionStatus
- */
+
+export const SessionStatus = {
+  UNKNOWN: "Desconocido",
+  PENDING: "Pendiente",
+  COMPLETED: "Completado",
+  CANCELED: "Cancelado",
+  NO_SHOW: "No asistió"
+};
+
+/** @typedef {typeof SessionStatus[keyof typeof SessionStatus]} SessionStatus */
 
 //-------------------------- Models -------------------------//
 //---------------------- Session Models ---------------------//
