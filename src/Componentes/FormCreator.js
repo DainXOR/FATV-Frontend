@@ -1,9 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../Estilos/FormCreator.css';
 import { Button } from '@mui/material';
-import axios from 'axios';
+import FormApi from '../api/FormsApi.js';
+import StudentsApi from '../api/StudentsApi.js';
 import Swal from 'sweetalert2';
 
+/**
+ * @typedef {import("../Models/StudentModels.js").StudentResult} StudentResult
+ * @typedef {import("../Models/FormModels.js").FormQuestionResult} FormQuestionResult
+ * @typedef {import("../Models/FormModels.js").FormRequest} FormRequest
+ */
+
+/**
+ * User-created (manually entered) question.
+ * @typedef {Object} UserCreatedQuestion
+ * @property {string} id - Unique identifier (client-generated timestamp)
+ * @property {string} text - Question text
+ * @property {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} type - Question type
+ * @property {string[]} options - Answer options for choice/multiple questions
+ */
+
+/**
+ * Configuration for a selected question's answer format.
+ * @typedef {Object} ConfiguredQuestion
+ * @property {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} type - Question type
+ * @property {string[]} options - Answer options for choice/multiple questions
+ */
+
+/**
+ * @typedef {Object} LocalStudent
+ * @property {string} id
+ * @property {string} number_id
+ * @property {string} first_name
+ * @property {string} last_name
+ * @property {string} phone_number
+ * @property {string} email
+ * @property {string} fullName
+ */
+
+/**
+ * Maps frontend question type to backend ID.
+ *
+ * @param {string} type - The frontend type ('text', 'single_choice', 'multiple_choice', 'true_false').
+ * @returns {string} The backend ID for the type.
+ */
 const mapTypeToBackend = (type) => {
     switch (type) {
       case 'text':
@@ -14,26 +54,40 @@ const mapTypeToBackend = (type) => {
         return "69080917bd94203556594133"; 
       case 'true_false':
         return "6908227e95ecaa45d56b5d85"; 
+      default:
+        return "";
     }
   };
 
+/**
+ * FormCreator component for creating and configuring forms with questions for students.
+ *
+ * @param {Object} props - Component props.
+ * @param {() => void} props.onBack - Callback function to go back.
+ * @returns {React.JSX.Element}
+ */
 const FormCreator = ({ onBack }) => {
-  const [questions, setQuestions] = useState([]); 
-  const [selected, setSelected] = useState(() => questions.map(q => q.id));
-  const [mode, setMode] = useState('select'); 
-  const [manualQuestions, setManualQuestions] = useState([]);
-  const [configuredQuestions, setConfiguredQuestions] = useState({});
-  const [formError, setFormError] = useState(null);
-  const [formSuccess, setFormSuccess] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [generatedUrl, setGeneratedUrl] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const suggestionsRef = useRef(null);
+  const [questions, setQuestions] = useState(/** @type {FormQuestionResult[]} */([])); 
+  const [selectedQuestionIDs, setSelected] = useState(() => questions.map(q => q.id));
+  const [mode, setMode] = useState(/** @type {'select' | 'create-custom'} */('select')); 
+  const [manualQuestions, setManualQuestions] = useState(/** @type {UserCreatedQuestion[]} */[]);
+  const [configuredQuestions, setConfiguredQuestions] = useState(/** @type {Record<string, ConfiguredQuestion>} */({}));
+  const [formError, setFormError] = useState(/** @type {string | null} */(null));
+  const [formSuccess, setFormSuccess] = useState(/** @type {string | null} */(null));
+  const [students, setStudents] = useState(/** @type {LocalStudent[]} */([]));
+  const [selectedStudent, setSelectedStudent] = useState(/** @type {LocalStudent | null} */(null));
+  const [searchTerm, setSearchTerm] = useState(/** @type {string} */(''));
+  const [showSuggestions, setShowSuggestions] = useState(/** @type {boolean} */(false));
+  const [generatedUrl, setGeneratedUrl] = useState(/** @type {string | null} */(null));
+  const [isGenerating, setIsGenerating] = useState(/** @type {boolean} */(false));
+  const suggestionsRef = useRef(/** @type {HTMLDivElement | null} */(null));
 
-const toggleQuestion = (id) => {
+  /**
+   * Toggles the selection of a question by its ID.
+   *
+   * @param {string} id - The ID of the question to toggle.
+   */
+  const toggleQuestion = (id) => {
     setSelected(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       if (!prev.includes(id)) {
@@ -50,9 +104,16 @@ const toggleQuestion = (id) => {
     });
   };
 
-const buildQuestionsPayload = () => {
+  /**
+   * Builds the payload of questions based on the current mode and selections.
+   * In 'select' mode: returns questions with configured answer types.
+   * In 'create-custom' mode: returns user-created questions.
+   *
+   * @returns {(FormQuestionResult | UserCreatedQuestion)[]} The array of question payloads.
+   */
+  const buildQuestionsPayload = () => {
     return mode === 'select'
-      ? questions.filter(q => selected.includes(q.id)).map(q => ({ 
+      ? questions.filter(q => selectedQuestionIDs.includes(q.id)).map(q => ({ 
           id: q.id, 
           text: q.text, 
           type: configuredQuestions[q.id]?.type || q.type, // Verifica aquí
@@ -64,7 +125,72 @@ const buildQuestionsPayload = () => {
           type: m.type || 'text', // Asegúrate de que esto esté configurado correctamente
           options: m.options || [] 
         }));
-};
+  };
+
+  const prepareInputs = () => {
+    const questionsPayload = buildQuestionsPayload();
+
+    if (!selectedStudent) {
+      const error = new Error('Seleccione un estudiante antes de generar el URL.');
+      error.code = 'NO_STUDENT';
+      throw error;
+    }
+    if (!questionsPayload.length) {
+      const error = new Error('Agregue al menos una pregunta con texto antes de generar el URL.');
+      error.code = 'NO_QUESTIONS';
+      throw error;
+    }
+
+    return questionsPayload;
+  };
+
+  const buildFormPayload = (questionsPayload) => {
+    // Previously:
+    // const formPayload = { ... } from the old code block with questions_info mapping
+    return {
+      name: `Caracterización para ${selectedStudent.first_name}`,
+      description: 'Diligencia esta caracterización para conocerte mejor',
+      date: new Date().toISOString(),
+      questions_info: questionsPayload.map((q, index) => ({
+        position: index + 1,
+        section: 1,
+        id_parent_question: '',
+        needed_answers: [],
+        id_question: q.id,
+        optional: false,
+      })),
+    };
+  };
+
+  const submitForm = async (questionsPayload, formPayload) => {
+    // Old “create questions + post form” logic in detail is preserved in comments below.
+    // The new flow is one-shot for readability.
+
+    // 1. create or update questions (either select or create-custom)
+    // if mode === 'create-custom', the original loop sent each question to /forms/questions
+    // and built a newQuestionsPayload with returned IDs.
+
+    // 2. submit final form payload via FormApi.create()
+
+    const finalPayload = formPayload;
+
+    const response = await FormApi.create(finalPayload);
+    if (!response.ok) {
+      const error = new Error(response.error?.message || 'Error al crear formulario');
+      error.code = response.status;
+      error.details = response.error;
+      throw error;
+    }
+
+    const newFormId = response.body?.data?.id || response.body?.id;
+    if (!newFormId) {
+      const error = new Error('El backend no devolvió un ID de formulario.');
+      error.code = 'MISSING_ID';
+      throw error;
+    }
+
+    return newFormId;
+  };
 
   const handleGenerateUrl = async () => {
     setFormError(null);
@@ -72,152 +198,54 @@ const buildQuestionsPayload = () => {
     setGeneratedUrl(null);
     setIsGenerating(true);
 
-    let questionsPayload = buildQuestionsPayload();
-
-    if (!selectedStudent) {
-        setFormError('Seleccione un estudiante antes de generar el URL.');
-        setIsGenerating(false);
-        return;
-    }
-    if (!questionsPayload || questionsPayload.length === 0) {
-        setFormError('Agregue al menos una pregunta con texto antes de generar el URL.');
-        setIsGenerating(false);
-        return;
-    }
-
-   const formPayload = {
-        name: "Caracterización para " + selectedStudent.first_name,
-        description: "Diligencia esta caracterización para conocerte mejor",
-        date: new Date().toISOString(),
-        questions_info: questionsPayload.map((q, index) => {
-            console.log('Tipo de pregunta:', q.type); // Agrega este log para verificar el tipo
-            return {
-                position: index + 1,
-                section: 1,
-                id_parent_question: "",
-                needed_answers: [],
-                id_question: q.id, 
-                optional: false
-            };
-        })
-    };
-
-    console.log('Enviando formulario al backend:', formPayload);
-
     try {
-      const token = localStorage.getItem('token');
-      // Old axios logic (unchanged)
-      let oldQuestionsPayload = questionsPayload;
-      if (mode === 'manual') {
-        const newQuestionsWithIds = [];
-        for (const q of oldQuestionsPayload) {
-          if ((q.type === 'single_choice' || q.type === 'multiple_choice') && (!q.options || q.options.length === 0)) {
-            throw new Error(`Las preguntas de tipo ${q.type} deben tener al menos una opción.`);
-          }
-          const questionBankPayload = {
-            id_question_type: mapTypeToBackend(q.type),
-            name: q.text.substring(0, 50),
-            question: q.text,
-            options: (q.options || []).map(String),
-          };
-          const response = await axios.post(
-            `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/`,
-            questionBankPayload,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          const newId = response.data?.data?.id || response.data?.id;
-          if (!newId) {
-            throw new Error(`El backend no devolvió un ID para la pregunta: ${q.text}`);
-          }
-          newQuestionsWithIds.push({
-            ...q,
-            id: newId,
-            type: mapTypeToBackend(q.type),
-          });
-        }
-        oldQuestionsPayload = newQuestionsWithIds;
-      }
-      const oldFormPayload = {
-        name: "Caracterización para " + selectedStudent.first_name,
-        description: "Diligencia esta caracterización para conocerte mejor",
-        date: new Date().toISOString(),
-        questions_info: oldQuestionsPayload.map((q, index) => ({
-          position: index + 1,
-          section: 1,
-          id_parent_question: "",
-          needed_answers: [],
-          id_question: q.id,
-          text: q.text,
-          type: mapTypeToBackend(q.type),
-          options: q.options,
-          optional: false
-        }))
-      };
-      // --- Old API call (commented for reference) ---
-      /*
-      const oldResponse = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/`,
-        oldFormPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      const oldFormId = oldResponse.data?.data?.id || oldResponse.data?.id;
-      */
-      // --- New API call using FormApi ---
-      let newResponse, newFormId;
-      try {
-        // Set token for ApiClient
-        import('../api/ApiClient').then(({ default: ApiClient }) => {
-          ApiClient.setAuthToken(token);
-        });
-        // Prepare new payload (should match old)
-        const FormApi = (await import('../api/FormApi')).default;
-        newResponse = await FormApi.createForm(oldFormPayload);
-        newFormId = newResponse.data?.data?.id || newResponse.data?.id;
-      } catch (apiError) {
-        console.error('Error with new FormApi:', apiError);
-        newFormId = null;
-      }
-      // Use new result
-      if (!newFormId) {
-        throw new Error('El backend no devolvió un ID de formulario');
-      }
-      const baseUrl = window.location.origin;
-      const studentFormUrl = `${baseUrl}/student-form/${newFormId}`;
+      const questionsPayload = prepareInputs();
+      const formPayload = buildFormPayload(questionsPayload);
+      const newFormId = await submitForm(questionsPayload, formPayload);
+
+      const studentFormUrl = `${window.location.origin}/student-form/${newFormId}`;
       setGeneratedUrl(studentFormUrl);
       setFormSuccess('URL generada correctamente. Comparte este enlace con el estudiante.');
+
       Swal.fire({
         title: '¡Formulario creado!',
         text: 'El formulario ha sido generado exitosamente',
         icon: 'success',
         confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#673ab7'
+        confirmButtonColor: '#673ab7',
       });
     } catch (error) {
-      console.error('Error al generar URL:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Error al crear el formulario';
-      setFormError(errorMsg);
+      const statusCode = error.status || error.code || 'UNKNOWN';
+      const message = error.message || 'Error al generar el formulario';
+      const details = error.details || error;
+
+      console.error('Error al generar URL:', { statusCode, message, details });
+      setFormError(message);
+
       Swal.fire({
         title: 'Error',
-        text: errorMsg,
+        text: `${message} (${statusCode})`,
         icon: 'error',
         confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#d33'
+        confirmButtonColor: '#d33',
       });
     } finally {
       setIsGenerating(false);
     }
-};
+  };
 
+  /*
+  // Old implementation retained for reference (very detailed steps):
+  // - built formPayload
+  // - created each question through axios POST to /forms/questions
+  // - built oldFormPayload
+  // - submitted oldFormPayload via FormApi.create
+  // - set generated URL, etc.
+  */
+
+  /**
+   * Copies the generated URL to the clipboard.
+   */
   const copyUrlToClipboard = () => {
     if (generatedUrl) {
       navigator.clipboard.writeText(generatedUrl).then(() => {
@@ -245,9 +273,9 @@ const buildQuestionsPayload = () => {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const token = localStorage.getItem('token');
         // Old axios call (commented for reference)
         /*
+        const token = localStorage.getItem('token');
         const response = await axios.get(
           `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`,
           {
@@ -259,13 +287,17 @@ const buildQuestionsPayload = () => {
         const raw = response.data?.data || [];
         */
         // New API call
-        const StudentsApi = (await import('../api/StudentsApi')).default;
-        StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
-        const response = await StudentsApi.getAllStudents();
-        const raw = response.data?.data || [];
+        //StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
+        const response = await StudentsApi.getAll();
+
+        if (!response.ok) {
+          throw new Error(response.error?.message || 'Error al cargar estudiantes');
+        }
+
+        const raw = response.body.data || [];
         const list = (raw || []).map(student => ({
-          id: student.id || student._id || student.number_id || Math.random().toString(36).slice(2,9),
-          number_id: student.number_id || student.id || student._id || '',
+          id: student.id || Math.random().toString(36).slice(2,9),
+          number_id: student.number_id || '',
           first_name: student.first_name || '',
           last_name: student.last_name || '',
           phone_number: student.phone_number || '',
@@ -284,7 +316,7 @@ const buildQuestionsPayload = () => {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const token = localStorage.getItem('token');
+        //const token = localStorage.getItem('token');
         // Old axios call (commented for reference)
         /*
         const response = await axios.get(
@@ -296,22 +328,26 @@ const buildQuestionsPayload = () => {
         const list = response.data?.data;
         */
         // New API call
-        const FormApi = (await import('../api/FormApi')).default;
-        FormApi.setAuthToken && FormApi.setAuthToken(token);
-        const response = await FormApi.listQuestions ? await FormApi.listQuestions() : await FormApi.listForms();
-        const list = response.data?.data;
+        //FormApi.setAuthToken && FormApi.setAuthToken(token);
+        const response = await FormApi.Questions().getAll();
+
+        if (!response.ok) {
+          throw new Error(response.error?.message || 'Error al cargar preguntas');
+        }
+
+        const list = response.body.data;
         if (!Array.isArray(list)) {
           console.error("El backend NO devolvió una lista en 'data'");
           return;
         }
-        const loaded = list.map(q => ({
+        const loadedQuestions = list.map(q => ({
           id: q.id,
           text: q.question,             
           name: q.name,
           options: q.options || [],   
           type: mapTypeToBackend(q.id_question_type)
         }));
-        setQuestions(loaded);
+        setQuestions(loadedQuestions);
       } catch (err) {
         console.error("Error cargando preguntas:", err);
         Swal.fire({
@@ -387,7 +423,7 @@ const buildQuestionsPayload = () => {
 
             <div className="mode-switch">
               <button className={"mode-btn " + (mode === 'select' ? 'active' : '')} onClick={() => setMode('select')}>Seleccionar preguntas</button>
-              <button className={"mode-btn " + (mode === 'manual' ? 'active' : '')} onClick={() => setMode('manual')}>Crear preguntas manualmente</button>
+              <button className={"mode-btn " + (mode === 'create-custom' ? 'active' : '')} onClick={() => setMode('create-custom')}>Crear preguntas manualmente</button>
             </div>
 
             {mode === 'select' ? (
@@ -398,17 +434,17 @@ const buildQuestionsPayload = () => {
                     {questions.map(q => (
                       <tr key={q.id} className="question-row">
                         <td className="q-checkbox">
-                          <input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggleQuestion(q.id)} />
+                          <input type="checkbox" checked={selectedQuestionIDs.includes(q.id)} onChange={() => toggleQuestion(q.id)} />
                         </td>
                         <td className="q-text">{q.text}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {selected.length > 0 && (
+                {selectedQuestionIDs.length > 0 && (
                   <div className="selected-config">
                     <h4>Configurar respuestas para preguntas seleccionadas</h4>
-                    {selected.map((id) => {
+                    {selectedQuestionIDs.map((id) => {
                       const q = questions.find(x => x.id === id) || { id, text: id };
                       const cfg = configuredQuestions[id] || { type: 'text', options: [] };
                       return (

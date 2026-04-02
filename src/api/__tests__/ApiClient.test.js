@@ -67,7 +67,6 @@ describe("ApiClient", () => {
   });
 
   test("maps non-Axios unknown error", async () => {
-    const axios = (await import("axios")).default;
     const { Api } = await import("../ApiClient.js");
 
     const api = new Api({

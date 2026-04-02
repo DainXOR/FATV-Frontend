@@ -1,3 +1,6 @@
+import ApiClient from "../ApiClient.js";
+import AlertsApi from "../AlertsApi.js";
+
 jest.mock("../ApiClient.js", () => {
   const mockApiClient = {
     get: jest.fn(),
@@ -13,19 +16,12 @@ jest.mock("../ApiClient.js", () => {
 });
 
 
-
-import ApiClient from "../ApiClient.js";
-import { AlertsApi } from "../AlertsApi.js";
-
-
 describe("AlertsApi", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   test("updateById calls ApiClient.put with correct route and params", async () => {
-    const api = new AlertsApi();
-
     // @ts-ignore
     ApiClient.put.mockResolvedValue({
       ok: true,
@@ -41,7 +37,7 @@ describe("AlertsApi", () => {
       message: "Test",
     };
 
-    await api.updateById("123", body);
+    await AlertsApi.updateById("123", body);
 
     expect(ApiClient.put).toHaveBeenCalledTimes(1);
     expect(ApiClient.put).toHaveBeenCalledWith(
@@ -54,8 +50,6 @@ describe("AlertsApi", () => {
   });
 
   test("create calls ApiClient.post with correct route", async () => {
-    const api = new AlertsApi();
-
     // @ts-ignore
     ApiClient.post.mockResolvedValue({
       ok: true,
@@ -71,7 +65,7 @@ describe("AlertsApi", () => {
       message: "Test",
     };
 
-    await api.create(body);
+    await AlertsApi.create(body);
 
     expect(ApiClient.post).toHaveBeenCalledWith(
       "alerts",
@@ -80,8 +74,6 @@ describe("AlertsApi", () => {
   });
 
   test("getAll calls ApiClient.get with /all", async () => {
-    const api = new AlertsApi();
-
     // @ts-ignore
     ApiClient.get.mockResolvedValue({
       ok: true,
@@ -89,14 +81,12 @@ describe("AlertsApi", () => {
       data: [],
     });
 
-    await api.getAll();
+    await AlertsApi.getAll();
 
     expect(ApiClient.get).toHaveBeenCalledWith("alerts/all");
   });
 
   test("getById calls ApiClient.get with id param", async () => {
-    const api = new AlertsApi();
-
     // @ts-ignore
     ApiClient.get.mockResolvedValue({
       ok: true,
@@ -104,7 +94,7 @@ describe("AlertsApi", () => {
       data: {},
     });
 
-    await api.getById("55");
+    AlertsApi.getById("55");
 
     expect(ApiClient.get).toHaveBeenCalledWith(
       "alerts",
@@ -113,8 +103,6 @@ describe("AlertsApi", () => {
   });
 
   test("deleteById calls ApiClient.delete correctly", async () => {
-    const api = new AlertsApi();
-
     // @ts-ignore
     ApiClient.delete.mockResolvedValue({
       ok: true,
@@ -122,7 +110,7 @@ describe("AlertsApi", () => {
       data: {},
     });
 
-    await api.deleteById("77");
+    await AlertsApi.deleteById("77");
 
     expect(ApiClient.delete).toHaveBeenCalledWith(
       "alerts",

@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import StudentsApi from "../api/StudentsApi";
 import Swal from 'sweetalert2';
 
+/**
+ * RegisterStudentPage component renders a student registration form
+ * and handles form state, validation and submission.
+ *
+ * @param {Object} props - Component props.
+ * @param {Object} [props.user] - Optional current user data.
+ * @returns {React.JSX.Element}
+ */
 const RegisterStudentPage = ({ user }) => {
     const [formData, setFormData] = useState({
         number_id: '',
@@ -19,12 +27,20 @@ const RegisterStudentPage = ({ user }) => {
         id_university: ''
     });
     const [loading, setLoading] = useState(false);
+    /**
+     * Update formData state when an input value changes.
+     *
+     * @param {React.ChangeEvent<HTMLInputElement | HTMLSelectElement>} e - Input change event.
+     */
     const handleChange = (e) => {
         setFormData({
             ...formData,
             [e.target.name]: e.target.value
         });
     };
+    /**
+     * Reset the form state to its initial empty values.
+     */
     const handleReset = () => {
         setFormData({
             number_id: '',
@@ -42,6 +58,12 @@ const RegisterStudentPage = ({ user }) => {
             id_university: ''
         });
     };
+    /**
+     * Handle student registration form submission.
+     *
+     * @param {React.FormEvent<HTMLFormElement>} e - Form submit event.
+     * @returns {Promise<void>}
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -80,11 +102,13 @@ const RegisterStudentPage = ({ user }) => {
             );
             */
             // New API call
-            const StudentsApi = (await import('../api/StudentsApi')).default;
-            StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
-            const response = await StudentsApi.registerStudent(dataToSend);
+            // StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
+            const response = await StudentsApi.create(dataToSend);
             console.log('JWT Token:', token);
-            console.log('User created successfully:', response.data);
+
+            if (response.ok) console.log('User created successfully:', response.body);
+            else throw new Error(`Failed to create user: ${response.status} - ${response.error.message}`);
+            
             Swal.fire({
                 title: 'Success!',
                 text: 'Data saved successfully',
@@ -107,15 +131,16 @@ const RegisterStudentPage = ({ user }) => {
                 semester: '',
                 id_university: ''
             });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error('Error sending data:', error);
             Swal.fire({
                 title: 'Error',
-                text: 'Error sending data',
+                text: 'Error creating student',
                 icon: 'error',
                 confirmButtonText: 'Accept',
                 confirmButtonColor: '#d33'
             });
+
             if (error.response) {
                 console.error('Server error:', error.response.data);
                 alert(`Server error: ${error.response.status} - ${error.response.data.message || 'Unknown error'}`);
@@ -265,7 +290,9 @@ const RegisterStudentPage = ({ user }) => {
                 </div>
                 <div className="button-group">
                     <button className="btn limpiar" type="button" onClick={handleReset}>Clear</button>
-                    <button className="btn guardar" type="submit">Save</button>
+                    <button className="btn guardar" type="submit" disabled={loading}>
+                        {loading ? 'Saving...' : 'Save'}
+                    </button>
                 </div>
             </form>
         </div>

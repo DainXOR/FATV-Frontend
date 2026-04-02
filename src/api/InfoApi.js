@@ -1,6 +1,3 @@
-import { Optional } from "../../../../../5e4c048e/frontend/my-app/src/tools/optional.js";
-import { api } from "../../../../../5e4c048e/frontend/my-app/src/routes/api/requestsApi.js";
-
 /**
  * @deprecated Use other API classes instead, this class is not used / updated anymore and will be removed in the future.
  */

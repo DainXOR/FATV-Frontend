@@ -24,6 +24,7 @@ class SessionsApi extends ApiBase {
 
     /**
      * @param {string} id
+     * @return {Promise<import("../utils/types.js").ApiResult<SessionResultModel[]>>}
      */
     async getByStudentId(id) {
         return ApiClient.get(this.route + "/student", { pathParams: [id] });

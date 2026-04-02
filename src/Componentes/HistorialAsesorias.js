@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
@@ -7,6 +6,8 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import '../Estilos/HistorialAsesorias.css'; 
 import Swal from 'sweetalert2';
+
+import SessionsApi from '../api/SessionsApi';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -23,7 +24,7 @@ const HistorialAsesorias = ({ estudianteId, onVolver }) => {
         const fetchHistorial = async () => {
             try {
                 setLoading(true);
-                const token = localStorage.getItem('jwt');
+                //const token = localStorage.getItem('jwt');
                 // Old axios call (commented for reference)
                 /*
                 const response = await axios.get(
@@ -34,11 +35,14 @@ const HistorialAsesorias = ({ estudianteId, onVolver }) => {
                 );
                 */
                 // New API call
-                const SupportApi = (await import('../api/SupportApi')).default;
-                SupportApi.setAuthToken && SupportApi.setAuthToken(token);
-                const response = await SupportApi.getStudentAsesorias(estudianteId, page, 5);
-                if (response.data?.success) {
-                    setHistorial(response.data.data);
+                // SupportApi.setAuthToken && SupportApi.setAuthToken(token);
+                const response = await SessionsApi.getByStudentId(estudianteId);
+                if (!response.ok) {
+                    throw new Error(response.error.message || 'Error al cargar asesorías');
+                }
+
+                if (response.body.data) {
+                    setHistorial(response.body.data);
                 } else {
                     setError('No se pudieron cargar las asesorías');
                 }

@@ -1,32 +1,57 @@
-import { Optional } from "../../../../../5e4c048e/frontend/my-app/src/tools/optional.js";
-import { api } from "../../../../../5e4c048e/frontend/my-app/src/routes/api/requestsApi.js";
+import ApiClient from "./ApiClient";
 
 export class TestApi {
-    #api;
+    /** @type {string} */
     #route;
-    constructor(api) {
-        this.#api = api;
-        this.#route = "test/";
+
+    constructor() {
+        this.#route = "test";
     }
+
     async get() {
-        return this.#api.get(this.#route + "get");
+        return ApiClient.get(`${this.#route}/get`);
     }
+
+    /**
+     * @param {any} data 
+     * @returns 
+     */
     async post(data) {
-        return this.#api.post(this.#route + "post", Optional.from(() => data));
+        return ApiClient.post(`${this.#route}/post`, {body: data});
     }
+
+    /**
+     * @param {any} data 
+     * @returns 
+     */
     async put(data) {
-        return this.#api.put(this.#route + "put", Optional.from(() => data));
+        return ApiClient.put(`${this.#route}/put`, {body: data});
     }
+
+    /**
+     * @param {any} data 
+     * @returns 
+     */
     async patch(data) {
-        return this.#api.patch(this.#route + "patch", Optional.from(() => data));
+        return ApiClient.patch(`${this.#route}/patch`, {body: data});
     }
     async delete() {
-        return this.#api.delete(this.#route + "del");
+        return ApiClient.delete(`${this.#route}/delete`);
     }
+
+    /**
+     * @param {any} data 
+     * @returns 
+     */
     async postWhReceive(data) {
-        return this.#api.post(this.#route + "wh/receive", Optional.from(() => data));
+        return ApiClient.post(`${this.#route}/wh/receive`, {body: data});
     }
+
+    /**
+     * @param {string} msg
+     * @returns 
+     */
     async postWhSend(msg) {
-        return this.#api.post(this.#route + `wh/send/${msg}`);
+        return ApiClient.post(`${this.#route}/wh/send`, {pathParams: [msg]});
     }
 }

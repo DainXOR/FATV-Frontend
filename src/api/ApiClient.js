@@ -366,6 +366,19 @@ export class Api {
 
     /**
      * @template TResponse
+     * @template TBody
+     * 
+     * @param {string} path
+     * @param {import("../utils/types.js").RequestOptions<TBody>} options
+     * 
+     * @returns {Promise<import("../utils/types.js").ApiResult<TResponse>>}
+     */
+    async patch(path, options = {}) {
+        return this.#request('patch', path, options);
+    }
+
+    /**
+     * @template TResponse
      * 
      * @param {string} path
      * @param {import("../utils/types.js").RequestOptions<{}>} options

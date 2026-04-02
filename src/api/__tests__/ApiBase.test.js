@@ -1,3 +1,6 @@
+import { ApiBase } from "../ApiBase.js";
+import ApiClient from "../ApiClient.js";
+
 jest.mock("../ApiClient.js", () => ({
   __esModule: true,
   default: {
@@ -7,9 +10,6 @@ jest.mock("../ApiClient.js", () => ({
     delete: jest.fn(),
   },
 }));
-
-import { ApiBase } from "../ApiBase.js";
-import ApiClient from "../ApiClient.js";
 
 describe("ApiBase", () => {
   beforeEach(() => {
