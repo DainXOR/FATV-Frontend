@@ -9,12 +9,17 @@ import Swal from 'sweetalert2';
 
 import SessionsApi from '../api/SessionsApi';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+/**
+ * @typedef {import("../Models/StudentModels").StudentResult} StudentResult
+ * @typedef {import("../Models/CompanionModels").CompanionResult} CompanionResult
+ * @typedef {import("../Models/SessionModels").SessionResult} SessionResult
+ * @typedef {import("../Models/SessionModels").SessionRequest} SessionRequest
+*/
 
 const HistorialAsesorias = ({ estudianteId, onVolver }) => {
-    const [historial, setHistorial] = useState(null);
+    const [historial, setHistorial] = useState(/** @type {SessionResult[]} */([]));
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState(/** @type {string} */ (""));
     const [page, setPage] = useState(1);
     const perPage = 10; // Número de asesorías por página
     const [filterMonth, setFilterMonth] = useState(''); // formato YYYY-MM
@@ -24,26 +29,14 @@ const HistorialAsesorias = ({ estudianteId, onVolver }) => {
         const fetchHistorial = async () => {
             try {
                 setLoading(true);
-                //const token = localStorage.getItem('jwt');
-                // Old axios call (commented for reference)
-                /*
-                const response = await axios.get(
-                  `${API_URL}/asesorias/estudiante/${estudianteId}?page=${page}&limit=5`,
-                  {
-                    headers: { Authorization: `Bearer ${token}` }
-                  }
-                );
-                */
-                // New API call
-                // SupportApi.setAuthToken && SupportApi.setAuthToken(token);
                 const response = await SessionsApi.getByStudentId(estudianteId);
                 if (!response.ok) {
                     throw new Error(response.error.message || 'Error al cargar asesorías');
                 }
 
-                if (response.body.data) {
-                    setHistorial(response.body.data);
-                } else {
+                setHistorial(response.body.data);
+
+                if (response.body.data.length === 0) {
                     setError('No se pudieron cargar las asesorías');
                 }
             } catch (error) {

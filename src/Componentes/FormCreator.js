@@ -70,7 +70,7 @@ const FormCreator = ({ onBack }) => {
   const [questions, setQuestions] = useState(/** @type {FormQuestionResult[]} */([])); 
   const [selectedQuestionIDs, setSelected] = useState(() => questions.map(q => q.id));
   const [mode, setMode] = useState(/** @type {'select' | 'create-custom'} */('select')); 
-  const [manualQuestions, setManualQuestions] = useState(/** @type {UserCreatedQuestion[]} */[]);
+  const [manualQuestions, setManualQuestions] = useState(/** @type {UserCreatedQuestion[]} */([]));
   const [configuredQuestions, setConfiguredQuestions] = useState(/** @type {Record<string, ConfiguredQuestion>} */({}));
   const [formError, setFormError] = useState(/** @type {string | null} */(null));
   const [formSuccess, setFormSuccess] = useState(/** @type {string | null} */(null));
@@ -109,22 +109,38 @@ const FormCreator = ({ onBack }) => {
    * In 'select' mode: returns questions with configured answer types.
    * In 'create-custom' mode: returns user-created questions.
    *
+   * PROPERTY MISMATCH EXPLANATIONS (These errors can be ignored for now):
+   * 
+   * For 'select' mode:
+   *   - q.text (Line 118): FormQuestionResult has 'question' not 'text'
+   *     → We transform backend question→text for UI consistency
+   *   - q.type (Line 119): FormQuestionResult has 'id_question_type' not 'type'  
+   *     → Type comes from configuredQuestions state (user's UI selection)
+   *     → We use user's choice, not backend's id_question_type
+   *
+   * For 'create-custom' mode:
+   *   - m.text, m.id, m.type, m.options: These ARE correct (UserCreatedQuestion typedef)
+   *     → manualQuestions might be typed incorrectly in useState (shows 'never')
+   *     → Actually contains UserCreatedQuestion objects at runtime
+   *
    * @returns {(FormQuestionResult | UserCreatedQuestion)[]} The array of question payloads.
    */
   const buildQuestionsPayload = () => {
-    return mode === 'select'
-      ? questions.filter(q => selectedQuestionIDs.includes(q.id)).map(q => ({ 
+    if (mode === 'select'){
+        return questions.filter(q => selectedQuestionIDs.includes(q.id)).map(q => ({ 
           id: q.id, 
-          text: q.text, 
-          type: configuredQuestions[q.id]?.type || q.type, // Verifica aquí
+          text: q.question, 
+          type: configuredQuestions[q.id]?.type || mapTypeToBackend(q.id_question_type), // Verifica aquí
           options: configuredQuestions[q.id]?.options || [] 
         }))
-      : manualQuestions.filter(m => (m.text || '').trim()).map((m, idx) => ({ 
+      } else { 
+        return manualQuestions.filter(m => (m.text || '').trim()).map((m, idx) => ({ 
           id: m.id || `manual_${idx + 1}`,
           text: m.text, 
           type: m.type || 'text', // Asegúrate de que esto esté configurado correctamente
           options: m.options || [] 
         }));
+      }
   };
 
   const prepareInputs = () => {
@@ -234,15 +250,6 @@ const FormCreator = ({ onBack }) => {
     }
   };
 
-  /*
-  // Old implementation retained for reference (very detailed steps):
-  // - built formPayload
-  // - created each question through axios POST to /forms/questions
-  // - built oldFormPayload
-  // - submitted oldFormPayload via FormApi.create
-  // - set generated URL, etc.
-  */
-
   /**
    * Copies the generated URL to the clipboard.
    */
@@ -273,21 +280,6 @@ const FormCreator = ({ onBack }) => {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        // Old axios call (commented for reference)
-        /*
-        const token = localStorage.getItem('token');
-        const response = await axios.get(
-          `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            }
-          }
-        );
-        const raw = response.data?.data || [];
-        */
-        // New API call
-        //StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
         const response = await StudentsApi.getAll();
 
         if (!response.ok) {
@@ -316,38 +308,18 @@ const FormCreator = ({ onBack }) => {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        //const token = localStorage.getItem('token');
-        // Old axios call (commented for reference)
-        /*
-        const response = await axios.get(
-          `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/all`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        const list = response.data?.data;
-        */
-        // New API call
-        //FormApi.setAuthToken && FormApi.setAuthToken(token);
         const response = await FormApi.Questions().getAll();
 
         if (!response.ok) {
           throw new Error(response.error?.message || 'Error al cargar preguntas');
         }
 
-        const list = response.body.data;
-        if (!Array.isArray(list)) {
+        const questions = response.body.data;
+        if (!Array.isArray(questions)) {
           console.error("El backend NO devolvió una lista en 'data'");
           return;
         }
-        const loadedQuestions = list.map(q => ({
-          id: q.id,
-          text: q.question,             
-          name: q.name,
-          options: q.options || [],   
-          type: mapTypeToBackend(q.id_question_type)
-        }));
-        setQuestions(loadedQuestions);
+        setQuestions(questions);
       } catch (err) {
         console.error("Error cargando preguntas:", err);
         Swal.fire({
@@ -371,6 +343,358 @@ const FormCreator = ({ onBack }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ==================== HELPER FUNCTIONS FOR CLEANER JSX ====================
+
+  /**
+   * Gets the value to display in the student search input.
+   * Extracted from: value={selectedStudent ? selectedStudent.fullName : searchTerm}
+   */
+  const getSearchInputValue = () => {
+    if (selectedStudent) {
+      return selectedStudent.fullName;
+    }
+    return searchTerm;
+  };
+
+  /**
+   * Gets the email to display in the read-only email field.
+   * Extracted from: value={selectedStudent ? selectedStudent.email : ''}
+   */
+  const getSelectedStudentEmail = () => {
+    if (selectedStudent) {
+      return selectedStudent.email;
+    }
+    return '';
+  };
+
+  /**
+   * Gets the correct CSS class for mode button.
+   * Extracted from: className={"mode-btn " + (mode === 'select' ? 'active' : '')}
+   */
+  const getModeButtonClass = (buttonMode) => {
+    const baseClass = 'mode-btn';
+    const isActive = mode === buttonMode;
+    return isActive ? `${baseClass} active` : baseClass;
+  };
+
+  /**
+   * Renders student suggestions list.
+   * Extracted to eliminate complex nested JSX with multiple filter() calls.
+   */
+  const renderStudentSuggestions = () => {
+    const filteredStudents = students.filter(s => {
+      const fullName = (s.fullName || '').toLowerCase();
+      const search = (searchTerm || '').toLowerCase();
+      return fullName.includes(search);
+    });
+
+    const visibleStudents = filteredStudents.slice(0, 50);
+    const hasResults = filteredStudents.length > 0;
+
+    return (
+      <ul className="student-suggestions">
+        {visibleStudents.map(s => (
+          <li 
+            key={s.id} 
+            onMouseDown={() => { 
+              setSelectedStudent(s); 
+              setShowSuggestions(false); 
+              setSearchTerm(''); 
+            }}
+          >
+            <span className="s-name">{s.fullName || `${s.first_name} ${s.last_name}`}</span>
+            <span className="s-email">{s.email}</span>
+          </li>
+        ))}
+        {!hasResults && <li className="no-students">No se encontraron</li>}
+      </ul>
+    );
+  };
+
+  /**
+   * Renders the main form content based on current mode.
+   * Extracted to replace large ternary: {mode === 'select' ? ( <> ... select JSX ... </> ) : ( <> ... create JSX ... </> )}
+   */
+  const renderFormModeContent = () => {
+    if (mode === 'select') {
+      return renderSelectModeContent();
+    } else {
+      return renderCreateModeContent();
+    }
+  };
+
+  /**
+   * Renders the "select predefined questions" mode content.
+   */
+  const renderSelectModeContent = () => {
+    return (
+      <>
+        <h3>Selecciona la pregunta a enviar</h3>
+        <table className="questions-table">
+          <tbody>
+            {questions.map(q => (
+              <tr key={q.id} className="question-row">
+                <td className="q-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedQuestionIDs.includes(q.id)} 
+                    onChange={() => toggleQuestion(q.id)} 
+                  />
+                </td>
+                <td className="q-text">{q.text}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {selectedQuestionIDs.length > 0 && renderSelectedQuestionsConfig()}
+      </>
+    );
+  };
+
+  /**
+   * Renders the configuration panel for selected questions.
+   */
+  const renderSelectedQuestionsConfig = () => {
+    return (
+      <div className="selected-config">
+        <h4>Configurar respuestas para preguntas seleccionadas</h4>
+        {selectedQuestionIDs.map((id) => {
+          const q = questions.find(x => x.id === id) || { id, text: id };
+          const cfg = configuredQuestions[id] || { type: 'text', options: [] };
+          
+          return (
+            <div key={id} className="config-row">
+              <div className="config-question-text">{q.text}</div>
+              <select 
+                value={cfg.type} 
+                onChange={(e) => handleConfigTypeChange(id, e.target.value, cfg)}  
+                className="config-type-select"
+              >
+                <option value="text">Texto libre</option>
+                <option value="single_choice">Opción única</option>
+                <option value="multiple_choice">Múltiple respuesta</option>
+                <option value="true_false">Verdadero / Falso</option>
+              </select>
+              {(cfg.type === 'single_choice' || cfg.type === 'multiple_choice') && 
+                renderOptionsEditor(cfg, id, 'configured')}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /**
+   * Helper: Handle type change in configured questions.
+   * Extracted from: onChange={(e) => setConfiguredQuestions(c => ({ ...c, [id]: { ...c[id], type: e.target.value, options: ... } }))}
+   */
+  const handleConfigTypeChange = (questionId, newType, currentConfig) => {
+    let newOptions = currentConfig.options || [];
+    
+    if (newType === 'true_false') {
+      newOptions = ['Verdadero', 'Falso'];
+    }
+    
+    setConfiguredQuestions(c => ({
+      ...c,
+      [questionId]: {
+        ...c[questionId],
+        type: newType,
+        options: newOptions
+      }
+    }));
+  };
+
+  /**
+   * Renders options editor (appears for choice-type questions).
+   */
+  const renderOptionsEditor = (config, itemId, type) => {
+    const isChoiceType = config.type === 'single_choice' || config.type === 'multiple_choice';
+    
+    if (!isChoiceType) {
+      return null;
+    }
+
+    const className = type === 'configured' ? 'options-editor' : 'manual-options-editor';
+    
+    return (
+      <div className={className}>
+        {(config.options || []).map((opt, idx) => (
+          <div key={idx} className={type === 'configured' ? 'option-row' : 'manual-option-row'}>
+            <input 
+              value={opt} 
+              onChange={(e) => handleOptionChange(itemId, idx, e.target.value, type)} 
+              className="option-input" 
+            />
+            <button 
+              className="remove-option-btn" 
+              onClick={() => handleRemoveOption(itemId, idx, type)}
+            >
+              Eliminar
+            </button>
+          </div>
+        ))}
+        <button 
+          className="add-option-btn" 
+          onClick={() => handleAddOption(itemId, type)}
+        >
+          Agregar opción
+        </button>
+      </div>
+    );
+  };
+
+  /**
+   * Handle option text change (for both configured and manual questions).
+   */
+  const handleOptionChange = (itemId, optIdx, newText, type) => {
+    if (type === 'configured') {
+      setConfiguredQuestions(c => {
+        const copy = { ...c };
+        copy[itemId] = { 
+          ...copy[itemId], 
+          options: (copy[itemId].options || []).map((o, i) => i === optIdx ? newText : o) 
+        };
+        return copy;
+      });
+    } else {
+      setManualQuestions(prev => prev.map(p => 
+        p.id === itemId 
+          ? { ...p, options: p.options.map((o, i) => i === optIdx ? newText : o) }
+          : p
+      ));
+    }
+  };
+
+  /**
+   * Handle option removal (for both configured and manual questions).
+   */
+  const handleRemoveOption = (itemId, optIdx, type) => {
+    if (type === 'configured') {
+      setConfiguredQuestions(c => {
+        const copy = { ...c };
+        copy[itemId] = {
+          ...copy[itemId],
+          options: (copy[itemId].options || []).filter((_, i) => i !== optIdx)
+        };
+        return copy;
+      });
+    } else {
+      setManualQuestions(prev => prev.map(p =>
+        p.id === itemId
+          ? { ...p, options: p.options.filter((_, i) => i !== optIdx) }
+          : p
+      ));
+    }
+  };
+
+  /**
+   * Handle adding new option (for both configured and manual questions).
+   */
+  const handleAddOption = (itemId, type) => {
+    if (type === 'configured') {
+      setConfiguredQuestions(c => ({
+        ...c,
+        [itemId]: { ...c[itemId], options: [...(c[itemId]?.options || []), ''] }
+      }));
+    } else {
+      setManualQuestions(prev => prev.map(p =>
+        p.id === itemId
+          ? { ...p, options: [...(p.options || []), ''] }
+          : p
+      ));
+    }
+  };
+
+  /**
+   * Renders the "create questions manually" mode content.
+   */
+  const renderCreateModeContent = () => {
+    return (
+      <>
+        <h3>Crear preguntas manualmente</h3>
+        <div className="manual-questions">
+          {manualQuestions.map((mq, idx) => (
+            <div key={mq.id} className="manual-question-row">
+              <input
+                type="text"
+                placeholder={`Pregunta ${idx + 1}`}
+                value={mq.text}
+                onChange={(e) => handleManualQuestionChange(mq.id, 'text', e.target.value)}
+                className="manual-question-input"
+              />
+              <select 
+                value={mq.type} 
+                onChange={(e) => handleManualQuestionChange(mq.id, 'type', e.target.value)}
+                className="manual-type-select"
+              >
+                <option value="text">Texto libre</option>
+                <option value="single_choice">Opción única</option>
+                <option value="multiple_choice">Múltiple respuesta</option>
+                <option value="true_false">Verdadero / Falso</option>
+              </select>
+              {renderOptionsEditor(mq, mq.id, 'manual')}
+              <button 
+                className="remove-question-btn" 
+                onClick={() => handleRemoveManualQuestion(mq.id)}
+              >
+                Eliminar
+              </button>
+            </div>
+          ))}
+          <div style={{ marginTop: 8 }}>
+            <button 
+              className="add-question-btn" 
+              onClick={() => handleAddManualQuestion()}
+            >
+              Agregar pregunta
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  /**
+   * Handle manual question text/type changes.
+   * Extracted from complex nested onChange handlers.
+   */
+  const handleManualQuestionChange = (questionId, fieldType, value) => {
+    setManualQuestions(prev => prev.map(p => {
+      if (p.id !== questionId) return p;
+
+      if (fieldType === 'text') {
+        return { ...p, text: value };
+      } else if (fieldType === 'type') {
+        // When changing to true_false, auto-set options
+        const newOptions = value === 'true_false' ? ['Verdadero', 'Falso'] : p.options;
+        return { ...p, type: value, options: newOptions };
+      }
+      return p;
+    }));
+  };
+
+  /**
+   * Handle removing a manual question.
+   */
+  const handleRemoveManualQuestion = (questionId) => {
+    setManualQuestions(prev => prev.filter(p => p.id !== questionId));
+  };
+
+  /**
+   * Handle adding a new manual question.
+   */
+  const handleAddManualQuestion = () => {
+    setManualQuestions(prev => [...prev, {
+      id: `m${Date.now()}`,
+      text: '',
+      type: 'text',
+      options: []
+    }]);
+  };
+
+  // ==================== END HELPER FUNCTIONS ====================
+
   return (
     <div>
       <div className="formcreator-header-section">
@@ -388,7 +712,7 @@ const FormCreator = ({ onBack }) => {
                     type="text"
                     className="student-search-input"
                     placeholder="Buscar estudiante por nombre..."
-                    value={selectedStudent ? selectedStudent.fullName : searchTerm}
+                    value={getSearchInputValue()}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
                       setShowSuggestions(true);
@@ -396,25 +720,13 @@ const FormCreator = ({ onBack }) => {
                     }}
                     onFocus={() => setShowSuggestions(true)}
                   />
-                  {showSuggestions && (
-                    <ul className="student-suggestions">
-                      {students.filter(s => (s.fullName || '').toLowerCase().includes((searchTerm || '').toLowerCase())).slice(0, 50).map(s => (
-                        <li key={s.id} onMouseDown={() => { setSelectedStudent(s); setShowSuggestions(false); setSearchTerm(''); }}>
-                          <span className="s-name">{s.fullName || `${s.first_name} ${s.last_name}`}</span>
-                          <span className="s-email">{s.email}</span>
-                        </li>
-                      ))}
-                      {students.filter(s => (s.fullName || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length === 0 && (
-                        <li className="no-students">No se encontraron</li>
-                      )}
-                    </ul>
-                  )}
+                  {showSuggestions && renderStudentSuggestions()}
                 </div>
 
                 <input
                   type="email"
                   readOnly
-                  value={selectedStudent ? selectedStudent.email : ''}
+                  value={getSelectedStudentEmail()}
                   placeholder="Email del estudiante"
                   className="student-email-input"
                 />
@@ -422,108 +734,21 @@ const FormCreator = ({ onBack }) => {
             </div>
 
             <div className="mode-switch">
-              <button className={"mode-btn " + (mode === 'select' ? 'active' : '')} onClick={() => setMode('select')}>Seleccionar preguntas</button>
-              <button className={"mode-btn " + (mode === 'create-custom' ? 'active' : '')} onClick={() => setMode('create-custom')}>Crear preguntas manualmente</button>
+              <button 
+                className={getModeButtonClass('select')} 
+                onClick={() => setMode('select')}
+              >
+                Seleccionar preguntas
+              </button>
+              <button 
+                className={getModeButtonClass('create-custom')} 
+                onClick={() => setMode('create-custom')}
+              >
+                Crear preguntas manualmente
+              </button>
             </div>
 
-            {mode === 'select' ? (
-              <>
-                <h3>Selecciona la pregunta a enviar</h3>
-                <table className="questions-table">
-                  <tbody>
-                    {questions.map(q => (
-                      <tr key={q.id} className="question-row">
-                        <td className="q-checkbox">
-                          <input type="checkbox" checked={selectedQuestionIDs.includes(q.id)} onChange={() => toggleQuestion(q.id)} />
-                        </td>
-                        <td className="q-text">{q.text}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {selectedQuestionIDs.length > 0 && (
-                  <div className="selected-config">
-                    <h4>Configurar respuestas para preguntas seleccionadas</h4>
-                    {selectedQuestionIDs.map((id) => {
-                      const q = questions.find(x => x.id === id) || { id, text: id };
-                      const cfg = configuredQuestions[id] || { type: 'text', options: [] };
-                      return (
-                        <div key={id} className="config-row">
-                          <div className="config-question-text">{q.text}</div>
-                          <select value={cfg.type} onChange={(e) => setConfiguredQuestions(c => ({ ...c, [id]: { ...c[id], type: e.target.value, options: e.target.value === 'true_false' ? ['Verdadero','Falso'] : (c[id]?.options || []) } }))} className="config-type-select">
-     
-                            <option value="text">Texto libre</option>
-                            <option value="single_choice">Opción única</option>
-                            <option value="multiple_choice">Múltiple respuesta</option>
-                            <option value="true_false">Verdadero / Falso</option>
-                          </select>
-                          {(cfg.type === 'single_choice' || cfg.type === 'multiple_choice') && (
-                            <div className="options-editor">
-                              {(cfg.options || []).map((opt, idx) => (
-                                <div key={idx} className="option-row">
-                                  <input value={opt} onChange={(e) => setConfiguredQuestions(c => {
-                                    const copy = { ...c };
-                                    copy[id] = { ...copy[id], options: (copy[id].options || []).map((o, i) => i === idx ? e.target.value : o) };
-                                    return copy;
-                                  })} className="option-input" />
-                                  <button className="remove-option-btn" onClick={() => setConfiguredQuestions(c => {
-                                    const copy = { ...c };
-                                    copy[id] = { ...copy[id], options: (copy[id].options || []).filter((_, i) => i !== idx) };
-                                    return copy;
-                                  })}>Eliminar</button>
-                                </div>
-                              ))}
-                              <button className="add-option-btn" onClick={() => setConfiguredQuestions(c => ({ ...c, [id]: { ...c[id], options: [...(c[id]?.options || []), ''] } }))}>Agregar opción</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <h3>Crear preguntas manualmente</h3>
-                <div className="manual-questions">
-                  {manualQuestions.map((mq, idx) => (
-                    <div key={mq.id} className="manual-question-row">
-                      <input
-                        type="text"
-                        placeholder={`Pregunta ${idx + 1}`}
-                        value={mq.text}
-                        onChange={(e) => {
-                          const txt = e.target.value;
-                          setManualQuestions(prev => prev.map(p => p.id === mq.id ? { ...p, text: txt } : p));
-                        }}
-                        className="manual-question-input"
-                      />
-                      <select value={mq.type} onChange={(e) => setManualQuestions(prev => prev.map(p => p.id === mq.id ? { ...p, type: e.target.value, options: e.target.value === 'true_false' ? ['Verdadero','Falso'] : (p.options || []) } : p))} className="manual-type-select">
-                        <option value="text">Texto libre</option>
-                        <option value="single_choice">Opción única</option>
-                        <option value="multiple_choice">Múltiple respuesta</option>
-                        <option value="true_false">Verdadero / Falso</option>
-                      </select>
-                      {(mq.type === 'single_choice' || mq.type === 'multiple_choice') && (
-                        <div className="manual-options-editor">
-                          {(mq.options || []).map((opt, i) => (
-                            <div key={i} className="manual-option-row">
-                              <input value={opt} onChange={(e) => setManualQuestions(prev => prev.map(p => p.id === mq.id ? { ...p, options: p.options.map((o, idx2) => idx2 === i ? e.target.value : o) } : p))} className="option-input" />
-                              <button className="remove-option-btn" onClick={() => setManualQuestions(prev => prev.map(p => p.id === mq.id ? { ...p, options: p.options.filter((_, ii) => ii !== i) } : p))}>Eliminar</button>
-                            </div>
-                          ))}
-                          <button className="add-option-btn" onClick={() => setManualQuestions(prev => prev.map(p => p.id === mq.id ? { ...p, options: [...(p.options || []), ''] } : p))}>Agregar opción</button>
-                        </div>
-                      )}
-                      <button className="remove-question-btn" onClick={() => setManualQuestions(prev => prev.filter(p => p.id !== mq.id))}>Eliminar</button>
-                    </div>
-                  ))}
-                  <div style={{ marginTop: 8 }}>
-                    <button className="add-question-btn" onClick={() => setManualQuestions(prev => [...prev, { id: `m${Date.now()}`, text: '', type: 'text', options: [] }])}>Agregar pregunta</button>
-                  </div>
-                </div>
-              </>
-            )}
+            {renderFormModeContent()}
           </div>
 
           <div className="formcreator-footer">

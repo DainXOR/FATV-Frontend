@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import '../Estilos/UserInfoBar.css';
+
+import PrioritiesApi from '../api/PrioritiesApi';
+import AlertsApi from '../api/AlertsApi';
 
 const NotificationCenter = () => {
   const [open, setOpen] = useState(false);
@@ -15,21 +17,15 @@ const NotificationCenter = () => {
       setError(null);
       const fetchNotifications = async () => {
         try {
-          // Old axios calls (commented for reference)
-          /*
           const [res1, res2] = await Promise.all([
-            axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/priorities/all`),
-            axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/alerts/all`)
+            PrioritiesApi.getAll(),
+            AlertsApi.getAll()
           ]);
-          */
-          // New API calls
-          const SupportApi = (await import('../api/SupportApi')).default;
-          const [res1, res2] = await Promise.all([
-            SupportApi.getAllPriorities(),
-            SupportApi.getAllAlerts()
-          ]);
-          const priorityArray = Array.isArray(res1.data?.data) ? res1.data.data : [];
-          const alertsArray = Array.isArray(res2.data?.data) ? res2.data.data : [];
+          if (!res1.ok) throw new Error(res1.error.message || 'Error al cargar prioridades');
+          if (!res2.ok) throw new Error(res2.error.message || 'Error al cargar alertas');
+
+          const priorityArray = Array.isArray(res1.body.data) ? res1.body.data : [];
+          const alertsArray = Array.isArray(res2.body.data) ? res2.body.data : [];
           const all = [...priorityArray, ...alertsArray];
           setNotifications(all);
         } catch (err) {

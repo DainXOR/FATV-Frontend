@@ -1,48 +1,33 @@
 import React, { useState } from 'react';
-import StudentsApi from "../api/StudentsApi";
 import Swal from 'sweetalert2';
 
-/**
- * RegisterStudentPage component renders a student registration form
- * and handles form state, validation and submission.
- *
- * @param {Object} props - Component props.
- * @param {Object} [props.user] - Optional current user data.
- * @returns {React.JSX.Element}
+import StudentsApi from "../api/StudentsApi";
+
+/** @typedef {import("../Models/StudentModels").StudentRequest} StudentRequest */
+
+/** @typedef {Object} StudentFormData
+ * @property {string} number_id
+ * @property {string} first_name
+ * @property {string} last_name
+ * @property {string} phone_number
+ * @property {string} email
+ * @property {string} institution_email
+ * @property {string} streetType
+ * @property {string} streetNumber
+ * @property {string} buildingNumber
+ * @property {string} apartment
+ * @property {string} municipality
+ * @property {string} semester
+ * @property {string} id_university
  */
-const RegisterStudentPage = ({ user }) => {
-    const [formData, setFormData] = useState({
-        number_id: '',
-        first_name: '',
-        last_name: '',
-        phone_number: '',
-        email: '',
-        institution_email: '',
-        streetType: '',
-        streetNumber: '',
-        buildingNumber: '',
-        apartment: '',
-        municipality: '',
-        semester: '',
-        id_university: ''
-    });
-    const [loading, setLoading] = useState(false);
-    /**
-     * Update formData state when an input value changes.
-     *
-     * @param {React.ChangeEvent<HTMLInputElement | HTMLSelectElement>} e - Input change event.
-     */
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-    };
-    /**
-     * Reset the form state to its initial empty values.
-     */
-    const handleReset = () => {
-        setFormData({
+
+
+
+/**
+ * @returns {StudentFormData}
+ */
+function emptyStudentFormData() {
+    return {
             number_id: '',
             first_name: '',
             last_name: '',
@@ -56,7 +41,63 @@ const RegisterStudentPage = ({ user }) => {
             municipality: '',
             semester: '',
             id_university: ''
+        };
+}
+/**
+ * @param {StudentFormData} formData
+ * @returns {StudentRequest}
+ */
+function studentFormDataToRequest(formData) {
+    let id_university = formData.id_university;
+    if (id_university === 'Universidad de Antioquia') {
+        id_university = '685c180f0d2362de34ec5721';
+    } else if (id_university === 'Universidad Nacional') {
+        id_university = '685d566340a71701efb087a8';
+    }
+    const fullAddress = `${formData.streetType} ${formData.streetNumber} #${formData.buildingNumber}` +
+        (formData.apartment ? ` Apt ${formData.apartment}` : '') +
+        `, ${formData.municipality}`;
+
+    return {
+        number_id: formData.number_id,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone_number: formData.phone_number,
+        email: formData.email,
+        institution_email: formData.institution_email,
+        residence_address: fullAddress,
+        semester: parseInt(formData.semester, 10),
+        id_university: id_university
+    };
+}
+
+/**
+ * RegisterStudentPage component renders a student registration form
+ * and handles form state, validation and submission.
+ *
+ * @param {Object} props - Component props.
+ * @param {Object} [props.user] - Optional current user data.
+ * @returns {React.JSX.Element}
+ */
+const RegisterStudentPage = ({ user }) => {
+    const [studentFormData, setStudentFormData] = useState(emptyStudentFormData());
+    const [loading, setLoading] = useState(false);
+    /**
+     * Update formData state when an input value changes.
+     *
+     * @param {React.ChangeEvent<HTMLInputElement | HTMLSelectElement>} e - Input change event.
+     */
+    const handleChange = (e) => {
+        setStudentFormData({
+            ...studentFormData,
+            [e.target.name]: e.target.value
         });
+    };
+    /**
+     * Reset the form state to its initial empty values.
+     */
+    const handleReset = () => {
+        setStudentFormData(emptyStudentFormData());
     };
     /**
      * Handle student registration form submission.
@@ -67,47 +108,17 @@ const RegisterStudentPage = ({ user }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const token = localStorage.getItem('jwt');
-        let id_university = formData.id_university;
-        if (id_university === 'Universidad de Antioquia') {
-            id_university = '685c180f0d2362de34ec5721';
-        } else if (id_university === 'Universidad Nacional') {
-            id_university = '685d566340a71701efb087a8';
-        }
-        const fullAddress = `${formData.streetType} ${formData.streetNumber} #${formData.buildingNumber}` +
-            (formData.apartment ? ` Apt ${formData.apartment}` : '') +
-            `, ${formData.municipality}`;
-        const dataToSend = {
-            number_id: formData.number_id,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            phone_number: formData.phone_number,
-            email: formData.email,
-            institution_email: formData.institution_email,
-            residence_address: fullAddress,
-            semester: parseInt(formData.semester, 10),
-            id_university: id_university
-        };
+
+        const dataToSend = studentFormDataToRequest(studentFormData);
+
         try {
-            // Old axios call (commented for reference)
-            /*
-            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/v1/student/`, 
-                dataToSend, 
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-            */
-            // New API call
-            // StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
             const response = await StudentsApi.create(dataToSend);
-            console.log('JWT Token:', token);
 
             if (response.ok) console.log('User created successfully:', response.body);
-            else throw new Error(`Failed to create user: ${response.status} - ${response.error.message}`);
+            else {
+                console.error('Error creating user:', response.error);
+                throw new Error(`Failed to create user: ${response.status} - ${response.error.message}`);
+            }
             
             Swal.fire({
                 title: 'Success!',
@@ -116,30 +127,17 @@ const RegisterStudentPage = ({ user }) => {
                 confirmButtonText: 'Accept',
                 confirmButtonColor: '#28a745'
             });
-            setFormData({
-                number_id: '',
-                first_name: '',
-                last_name: '',
-                phone_number: '',
-                email: '',
-                institution_email: '',
-                streetType: '',
-                streetNumber: '',
-                buildingNumber: '',
-                apartment: '',
-                municipality: '',
-                semester: '',
-                id_university: ''
-            });
+            setStudentFormData(emptyStudentFormData());
+            
         } catch (/** @type {any} */ error) {
-            console.error('Error sending data:', error);
-            Swal.fire({
-                title: 'Error',
-                text: 'Error creating student',
-                icon: 'error',
-                confirmButtonText: 'Accept',
-                confirmButtonColor: '#d33'
-            });
+            console.error('Error sending data:', error);    
+            //Swal.fire({
+            //    title: 'Error',
+            //    text: 'Error creating student',
+            //    icon: 'error',
+            //    confirmButtonText: 'Accept',
+            //    confirmButtonColor: '#d33'
+            //});
 
             if (error.response) {
                 console.error('Server error:', error.response.data);
@@ -168,75 +166,75 @@ const RegisterStudentPage = ({ user }) => {
     };
     return (
         <div> 
-            <h2>Register Student</h2>
+            <h2>Registrar Estudiante</h2>
             <form onSubmit={handleSubmit} className="contact-form">
                 <div>
-                    <label>First Name <span className="required-asterisk">*</span></label>
+                    <label>Nombre <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="first_name" 
-                        value={formData.first_name} 
+                        value={studentFormData.first_name} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <div>
-                    <label>Last Name <span className="required-asterisk">*</span></label>
+                    <label>Apellido <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="last_name" 
-                        value={formData.last_name} 
+                        value={studentFormData.last_name} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <div>
-                    <label>ID Number <span className="required-asterisk">*</span></label>
+                    <label>Numero de documento <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="number_id" 
-                        value={formData.number_id} 
+                        value={studentFormData.number_id} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <div>
-                    <label>Phone Number <span className="required-asterisk">*</span></label>
+                    <label>Numero de celular <span className="required-asterisk">*</span></label>
                     <input 
                         type="text" 
                         name="phone_number" 
-                        value={formData.phone_number} 
+                        value={studentFormData.phone_number} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <div>
-                    <label>Personal Email <span className="required-asterisk">*</span></label>
+                    <label>Correo personal <span className="required-asterisk">*</span></label>
                     <input 
                         type="email" 
                         name="email" 
-                        value={formData.email} 
+                        value={studentFormData.email} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <div>
-                    <label>Institutional Email <span className="required-asterisk">*</span></label>
+                    <label>Correo institucional <span className="required-asterisk">*</span></label>
                     <input 
                         type="email" 
                         name="institution_email" 
-                        value={formData.institution_email} 
+                        value={studentFormData.institution_email} 
                         onChange={handleChange} 
                         required 
                     />
                 </div>
                 <fieldset className="direccion-group">
-                    <legend>Residence Address</legend>
+                    <legend>Direccion de residencia</legend>
                     <div className="direccion-row">
                         <div className="direccion-col">
-                            <label>Street Type <span className="required-asterisk">*</span></label>
-                            <select name="streetType" value={formData.streetType} onChange={handleChange} required>
-                                <option value="">Select</option>
+                            <label>Tipo de calle <span className="required-asterisk">*</span></label>
+                            <select name="streetType" value={studentFormData.streetType} onChange={handleChange} required>
+                                <option value="">Seleccionar</option>
                                 <option value="Avenida">Avenue</option>
                                 <option value="Calle">Street</option>
                                 <option value="Carrera">Road</option>
@@ -244,23 +242,23 @@ const RegisterStudentPage = ({ user }) => {
                             </select>
                         </div>
                         <div className="direccion-col">
-                            <label>Street Number <span className="required-asterisk">*</span></label>
-                            <input type="text" name="streetNumber" value={formData.streetNumber} onChange={handleChange} required />
+                            <label>Numero de calle <span className="required-asterisk">*</span></label>
+                            <input type="text" name="streetNumber" value={studentFormData.streetNumber} onChange={handleChange} required />
                         </div>
                         <div className="direccion-col">
-                            <label>Building Number <span className="required-asterisk">*</span></label>
-                            <input type="text" name="buildingNumber" value={formData.buildingNumber} onChange={handleChange} required />
+                            <label>Numero de residencia <span className="required-asterisk">*</span></label>
+                            <input type="text" name="buildingNumber" value={studentFormData.buildingNumber} onChange={handleChange} required />
                         </div>
                     </div>
                     <div className="direccion-row">
                         <div className="direccion-col">
-                            <label>Apartment (if applicable)</label>
-                            <input type="text" name="apartment" value={formData.apartment} onChange={handleChange} />
+                            <label>Apartamento (si aplica)</label>
+                            <input type="text" name="apartment" value={studentFormData.apartment} onChange={handleChange} />
                         </div>
                         <div className="direccion-col">
-                            <label>Municipality <span className="required-asterisk">*</span></label>
-                            <select name="municipality" value={formData.municipality} onChange={handleChange} required>
-                                <option value="">Select</option>
+                            <label>Municipalidad <span className="required-asterisk">*</span></label>
+                            <select name="municipality" value={studentFormData.municipality} onChange={handleChange} required>
+                                <option value="">Seleccionar</option>
                                 <option value="Bello">Bello</option>
                                 <option value="Medellín">Medellín</option>
                                 <option value="Itagüí">Itagüí</option>
@@ -271,18 +269,18 @@ const RegisterStudentPage = ({ user }) => {
                     </div>
                 </fieldset>
                 <div>
-                    <label>Semester <span className="required-asterisk">*</span></label>
-                    <select name="semester" value={formData.semester} onChange={handleChange} required>
-                        <option value="">Select</option>
+                    <label>Semestre <span className="required-asterisk">*</span></label>
+                    <select name="semester" value={studentFormData.semester} onChange={handleChange} required>
+                        <option value="">Seleccionar</option>
                         {[...Array(9)].map((_, i) => (
                             <option key={i + 1} value={i + 1}>{i + 1}</option>
                         ))}
                     </select>
                 </div>
                 <div>
-                    <label>University <span className="required-asterisk">*</span></label>
-                    <select name="id_university" value={formData.id_university} onChange={handleChange} required>
-                        <option value="">Select</option>
+                    <label>Universidad <span className="required-asterisk">*</span></label>
+                    <select name="id_university" value={studentFormData.id_university} onChange={handleChange} required>
+                        <option value="">Seleccionar</option>
                         <option value="Universidad de Antioquia">University of Antioquia</option>
                         <option value="Universidad Nacional">National University</option>
                         <option value="Universidad EAFIT">EAFIT University</option>

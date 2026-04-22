@@ -76,7 +76,7 @@ export class Api {
         this.#client.interceptors.request.use((config) => {
             const fullURL = `${config.baseURL}${config.url}`;
             console.log(`Request URL: ${config.method?.toUpperCase()} ${fullURL}`);
-            console.log(`Request Data: ${config.data}`);
+            console.log("Request Data:", config.data);
 
             
             // const token = authStore.getToken();

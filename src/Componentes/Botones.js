@@ -8,7 +8,7 @@ function Botones({ onNavigate }) {
       id: 'register',
       title: 'Registro de estudiantes',
       buttonText: 'Registrar datos',
-      image: 'registrar.png',
+      image: '/registrar.png',
       alt: 'register'
     },
     {
@@ -16,7 +16,7 @@ function Botones({ onNavigate }) {
       title: 'Editar datos',
       description: 'Edita o actualiza la información de los estudiantes',
       buttonText: 'Editar datos',
-      image: 'editar.png',
+      image: '/editar.png',
       alt: 'edit'
     },
     {
@@ -24,7 +24,7 @@ function Botones({ onNavigate }) {
       title: 'Acompañamientos',
       description: 'Añade nuevos acompañamientos',
       buttonText: 'Añadir acompañamiento',
-      image: 'acompañar.png',
+      image: '/acompañar.png',
       alt: 'support'
     },
     {
@@ -32,7 +32,7 @@ function Botones({ onNavigate }) {
       title: 'Visualiza acompañamientos',
       description: 'Consulta métricas y estadísticas de los acompañamientos realizados por mes',
       buttonText: 'Acompañamientos',
-      image: 'metricas.png',
+      image: '/metricas.png',
       alt: 'support-history'
     },
     {
@@ -40,7 +40,7 @@ function Botones({ onNavigate }) {
       title: 'Envíar caracterización',
       description: 'Crea y envía formularios de caracterización a estudiantes en riesgo de deserción',
       buttonText: 'Crear formulario',
-      image: 'formulario.png',
+      image: '/formulario.png',
       alt: 'form'
     }
   ];

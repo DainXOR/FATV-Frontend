@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import Swal from 'sweetalert2';
 import '../Estilos/StudentForm.css';
+
+import FormsApi from '../api/FormsApi';
 
 const StudentForm = ({ formId }) => {
   const [formConfig, setFormConfig] = useState(null);
@@ -20,26 +21,18 @@ const StudentForm = ({ formId }) => {
   useEffect(() => {
     const loadForm = async () => {
       try {
-        // Old axios calls (commented for reference)
-        /*
-        const resForm = await axios.get(
-          `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/${formId}`
-        );
-        const formData = resForm.data?.data || resForm.data;
-        const resBank = await axios.get(
-          `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/questions/all`
-        );
-        const bankList = resBank.data?.data || resBank.data || [];
-        */
-        // New API calls
-        const FormApi = (await import('../api/FormApi')).default;
-        const resForm = await FormApi.getForm(formId);
-        const formData = resForm.data?.data || resForm.data;
-        const resBank = await FormApi.listQuestions ? await FormApi.listQuestions() : await FormApi.listForms();
-        const bankList = resBank.data?.data || resBank.data || [];
-        // ...existing code...
-        // (rest of the mapping and formatting logic remains unchanged)
-        // ...existing code...
+        const resForm = await FormsApi.getById(formId);
+        if (!resForm.ok) {
+          throw new Error(resForm.error.message || 'Error al cargar el formulario');
+        }
+
+        const formData = resForm.body.data;
+        const resBank = await FormsApi.getAll();
+        if (!resBank.ok) {
+          throw new Error(resBank.error.message || 'Error al cargar el banco de preguntas');
+        }
+
+        const bankList = resBank.body.data;
       } catch (err) {
         Swal.fire("Error", "No se pudo cargar el formulario", "error");
       } finally {
@@ -104,16 +97,8 @@ const StudentForm = ({ formId }) => {
           answers: Array.isArray(answers[q.id]) ? answers[q.id] : [answers[q.id]]
         }))
       };
-      // Old axios call (commented for reference)
-      /*
-      await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/forms/answers/`,
-        payload
-      );
-      */
-      // New API call
-      const FormApi = (await import('../api/FormApi')).default;
-      await FormApi.submitAnswers(payload);
+      
+      await FormsApi.create(payload);
       Swal.fire("¡Listo!", "El formulario fue enviado con éxito", "success");
     } catch (err) {
       Swal.fire("Error", "No se pudo enviar el formulario", "error");

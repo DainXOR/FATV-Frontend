@@ -8,7 +8,14 @@ import CancelIcon from '@mui/icons-material/Cancel';
 
 import '../Estilos/TutoringHistoryView.css';
 import Swal from 'sweetalert2';
-import axios from 'axios';
+
+import SessionsApi from '../api/SessionsApi';
+
+/**
+ * @typedef {import("../Models/SessionModels").SessionResult} SessionResult
+ * @typedef {import("../Models/SessionModels").SessionTypeResult} SessionTypeResult
+ */
+
 
 const ITEMS_PER_PAGE = 10; 
 
@@ -19,7 +26,7 @@ const TutoringHistoryView = () => {
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [sessionTypes, setSessionTypes] = useState([]);
+  const [sessionTypes, setSessionTypes] = useState(/** @type {SessionTypeResult[]} */([]));
 
   // Estados para filtros
   const [statusFilter, setStatusFilter] = useState('');
@@ -47,26 +54,15 @@ const TutoringHistoryView = () => {
   // Cargar tipos de sesión
   const fetchSessionTypes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/session-types/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const sessionTypesData = response.data.data || [];
-      */
-      // New API call
-      const SupportApi = (await import('../api/SupportApi')).default;
-      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
-      const response = await SupportApi.getSessionTypes();
-      const sessionTypesData = response.data?.data || [];
+      const response = await SessionsApi.Types().getAll();
+      if (!response.ok) {
+        throw new Error(response.error.message || 'Error al cargar tipos de sesión');
+      }
+
+      const sessionTypesData = response.body.data || [];
       setSessionTypes(sessionTypesData);
       return sessionTypesData;
+
     } catch (error) {
       console.error('Error al cargar tipos de sesión:', error);
       const fallbackSessionTypes = [
@@ -84,27 +80,19 @@ const TutoringHistoryView = () => {
   };
 
   // Cargar todas las sesiones
+  /**
+   * 
+   * @param {SessionTypeResult[]} sessionTypesArray 
+   */
   const fetchSessions = async (sessionTypesArray = []) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v1/session/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const sessionsData = Array.isArray(response.data) ? response.data : response.data.data || [];
-      */
-      // New API call
-      const SupportApi = (await import('../api/SupportApi')).default;
-      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
-      const response = await SupportApi.getAllSessions();
-      const sessionsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+      const response = await SessionsApi.getAll();
+      if (!response.ok) {
+        throw new Error(response.error.message || 'Error al cargar sesiones');
+      }
+
+      const sessionsData = response.body.data;
       const mappedSessions = sessionsData.map(session => ({
         ...session,
         first_name: session.name || 'N/A',
@@ -171,23 +159,7 @@ const TutoringHistoryView = () => {
   // Función para actualizar el estado de la sesión
   const updateSessionStatus = async (sessionId, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      // Old axios call (commented for reference)
-      /*
-      const response = await axios.patch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v1/session/${sessionId}`,
-        { status: newStatus },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      */
-      // New API call
-      const SupportApi = (await import('../api/SupportApi')).default;
-      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
-      const response = await SupportApi.updateSessionStatus(sessionId, newStatus);
+      const response = await SessionsApi.updateById(sessionId, newStatus);
       // Actualizar el estado local
       const updatedSessions = sessions.map((session) =>
         session.id === sessionId ? { ...session, status: newStatus } : session

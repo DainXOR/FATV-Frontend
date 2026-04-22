@@ -39,10 +39,10 @@ const AgregarAcompanamiento = () => {
 
   // Estados para el autocompletado de estudiantes
   const [studentQuery, setStudentQuery] = useState('');
-  const [filteredStudents, setFilteredStudents] = useState(/** @type StudentResult[] */([]));
+  const [filteredStudents, setFilteredStudents] = useState(/** @type {StudentResult[]} */([]));
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(/** @type StudentResult|null */(null));
-  const studentInputRef = useRef(/** @type HTMLDivElement|null */(null));
+  const [selectedStudent, setSelectedStudent] = useState(/** @type {StudentResult|null} */(null));
+  const studentInputRef = useRef(/** @type {HTMLDivElement|null} */(null));
 
   // Estados para listas
   /** @type {[StudentResult[], Function]} */
@@ -273,10 +273,6 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
     setIsSubmitting(true); //Se deshabilita el botón para evitar múltiples envíos
 
     try {
-      //const token = localStorage.getItem('token');
-      // Use new API layer for support session creation
-      //const SupportApi = (await import('../api/SupportApi')).default;
-      //if (SupportApi.setAuthToken) SupportApi.setAuthToken(token);
       /** @type {SessionRequest} */
       const backendData = {
         id_student: formData.student,

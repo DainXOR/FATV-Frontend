@@ -19,20 +19,13 @@ import SupportHistoryPage from './pages/SupportHistoryPage';
 import AddSupportPage from './pages/AddSupportPage';
 import FormCreatorPage from './pages/FormCreatorPage';
 import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import { AuthProvider, useAuth } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import { config } from "./utils/config";
 
 /*El back debe regresar en esta sección el nombre y rol de la persona que ingresó. De momento, se hace de forma local */
 console.log("Back url: " + config.backendUrl)
-
-// Dashboard main page (empty for now, shows available menus)
-const DashboardHome = () => (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>Dashboard</h2>
-        <p>Welcome! Use the menu to access different sections.</p>
-    </div>
-);
 
 // Helper: Wrapper for sidebar and main content
 const MainLayout = ({ user }) => {
@@ -57,9 +50,9 @@ const MainLayout = ({ user }) => {
                         <UserInfoBar name={user.name} role={user.role} />
                     </div>
                     <Routes>
-                        <Route path="" element={<DashboardHome />} />
-                        <Route path="register" element={<RegisterStudentPage user={user} />} />
-                        <Route path="edit" element={<EditStudentsPage />} />
+                        <Route path="" element={<HomePage />} />
+                        <Route path="register" element={<RegisterStudentPage user={user} />} /> 
+                        <Route Here---- path="edit" element={<EditStudentsPage />} />
                         <Route path="support-history" element={<SupportHistoryPage />} />
                         <Route path="support" element={<AddSupportPage />} />
                         <Route path="form" element={<FormCreatorPage />} />

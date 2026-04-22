@@ -1,23 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import '../Estilos/StudentTable.css';
 import { Button } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import Swal from 'sweetalert2';
+
+import StudentsApi from '../api/StudentsApi';
+
+/**
+ * @typedef {import("../Models/StudentModels").StudentResult} StudentResult
+ */
 
 const ITEMS_PER_PAGE = 10;
 
-const StudentTable = ({ onNavigateToProfile }) => {
+const StudentTable = () => {
+    /** @type {Record<string, string>} */
     const universityNames = {
         '685c180f0d2362de34ec5721': 'Universidad de Antioquia',
         '685d566340a71701efb087a8': 'Universidad Nacional'
     };
     
     // Función para formatear la fecha a solo hora, minutos y segundos
-    const formatDateTime = (dateTimeString) => {
+    const formatDateTime = (/** @type {string} */ dateTimeString) => {
         if (!dateTimeString) return '';
         
         try {
@@ -43,25 +48,22 @@ const StudentTable = ({ onNavigateToProfile }) => {
         }
     };
 
-    const [students, setStudents] = useState([]);
-    const [filteredStudents, setFilteredStudents] = useState([]);
-    const [editingStudent, setEditingStudent] = useState(null);
-    const [formData, setFormData] = useState({});
+    const [students, setStudents] = useState(/** @type {StudentResult[]} */([]));
+    const [filteredStudents, setFilteredStudents] = useState(/** @type {StudentResult[]} */([]));
+    const [editingStudentID, setEditingStudentID] = useState(/** @type {string} */({}));
+    const [formData, setFormData] = useState(/** @type {StudentResult} */({}));
     const [currentPage, setCurrentPage] = useState(1);
     const [searchIdNumber, setSearchIdNumber] = useState('');
 
     useEffect(() => {
         const fetchStudents = async () => {
             try {
-                // Old axios call (commented for reference)
-                /*
-                const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/v2/students/all`);
-                const studentsData = Array.isArray(response.data) ? response.data : response.data.data || [];
-                */
-                // New API call
-                const StudentsApi = (await import('../api/StudentsApi')).default;
-                const response = await StudentsApi.getAllStudents();
-                const studentsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+                const response = await StudentsApi.getAll();
+                if (!response.ok) {
+                    throw new Error('Error al obtener estudiantes: ' + response.error.message);
+                }
+
+                const studentsData = response.body.data;
                 setStudents(studentsData);
                 setFilteredStudents(studentsData);
             } catch (error) {
@@ -96,40 +98,24 @@ const StudentTable = ({ onNavigateToProfile }) => {
         setCurrentPage(1); // Resetear a la primera página cuando cambie el filtro
     }, [students, searchIdNumber]);
 
-    const handleEditClick = (student) => {
-        setEditingStudent(student.id);
+    const handleEditClick = (/** @type {StudentResult} */ student) => {
+        setEditingStudentID(student.id);
         setFormData({ ...student });
     };
 
-    const handleChange = (e) => {
+    const handleChange = (/** @type {{ target: { name: any; value: any; }; }} */ e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const handleSave = async () => {
         try {
-            const token = localStorage.getItem('token');
-            // Old axios call (commented for reference)
-            /*
-            await axios.patch(
-                `${process.env.REACT_APP_BACKEND_URL}/api/v2/students/${editingStudent}`,
-                formData,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-            */
-            // New API call
-            const StudentsApi = (await import('../api/StudentsApi')).default;
-            StudentsApi.setAuthToken && StudentsApi.setAuthToken(token);
-            await StudentsApi.updateStudent(editingStudent, formData);
+            await StudentsApi.updateById(editingStudentID, formData);
+            // #TODO: Handle the actual api error response to show more specific messages
             const updatedStudents = students.map((student) =>
-                student.id === editingStudent ? { ...student, ...formData } : student
+                student.id === editingStudentID ? { ...student, ...formData } : student
             );
             setStudents(updatedStudents);
-            setEditingStudent(null);
+            setEditingStudentID("");
             Swal.fire({
                 title: '¡Éxito!',
                 text: 'Estudiante actualizado correctamente',
@@ -137,7 +123,7 @@ const StudentTable = ({ onNavigateToProfile }) => {
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: '#28a745'
             });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error('Error al actualizar estudiante:', error);
             Swal.fire({
                 title: 'Error',
@@ -150,14 +136,15 @@ const StudentTable = ({ onNavigateToProfile }) => {
     };
 
     // Función simplificada para manejar el cambio de filtro
-    const handleFilterChange = (e) => {
+    const handleFilterChange = (/** @type {{ target: { value: any; }; }} */ e) => {
         const value = e.target.value;
         setSearchIdNumber(value);
     };
 
     // Función para manejar cambios de página
-    const handlePageChange = (newPage) => {
-        if (newPage >= 1 && newPage <= totalPages) {
+    const handlePageChange = (/** @type {React.SetStateAction<number>} */ newPage) => {
+        let page = Number(newPage.valueOf());
+        if (page >= 1 && page <= totalPages) {
             setCurrentPage(newPage);
         }
     };
@@ -210,7 +197,7 @@ const StudentTable = ({ onNavigateToProfile }) => {
                         </thead>
                         <tbody>
                             {currentStudents.map((student) =>
-                                editingStudent === student.id ? (
+                                editingStudentID === student.id ? (
                                     <tr key={student.id}>
                                         <td><input name="number_id" value={formData.number_id || ''} onChange={handleChange} /></td>
                                         <td><input name="first_name" value={formData.first_name || ''} onChange={handleChange} /></td>
@@ -227,7 +214,7 @@ const StudentTable = ({ onNavigateToProfile }) => {
                                             <Button onClick={handleSave} color="success" variant="contained" size="small" style={{ marginRight: 5 }}>
                                                 <SaveIcon />
                                             </Button>
-                                            <Button onClick={() => setEditingStudent(null)} color="error" variant="contained" size="small" style={{ marginRight: 5 }}>
+                                            <Button onClick={() => setEditingStudentID("")} color="error" variant="contained" size="small" style={{ marginRight: 5 }}>
                                                 <CloseIcon />
                                             </Button>
                                         </td>
