@@ -31,7 +31,7 @@ console.log("Back url: " + config.backendUrl)
 const MainLayout = ({ user }) => {
     const navigate = useNavigate();
     // Only logo navigates to dashboard root
-    const goTo = (view) => {
+    const goTo = (/** @type {string} */ view) => {
         if (view === 'register') navigate('/dashboard/register', 'replace');
         else if (view === 'edit') navigate('/dashboard/edit', 'replace');
         else if (view === 'support-history') navigate('/dashboard/support-history', 'replace');

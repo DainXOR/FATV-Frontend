@@ -10,6 +10,7 @@ import StudentsApi from '../api/StudentsApi';
 
 /**
  * @typedef {import("../Models/StudentModels").StudentResult} StudentResult
+ * @typedef {import("../Models/StudentModels").StudentRequest} StudentRequest
  */
 
 const ITEMS_PER_PAGE = 10;
@@ -109,7 +110,19 @@ const StudentTable = () => {
 
     const handleSave = async () => {
         try {
-            await StudentsApi.updateById(editingStudentID, formData);
+            // I should not need to make this, but the form does not handle the correct types and uses strings for everything, so I need to convert them before sending the request
+            const requestData = {
+                number_id: formData.number_id,
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                institution_email: formData.institution_email,
+                email: formData.email,
+                semester: Number(formData.semester),
+                id_university: formData.id_university,
+                phone_number: formData.phone_number,
+                residence_address: formData.residence_address
+            };
+            await StudentsApi.updateById(editingStudentID, requestData);
             // #TODO: Handle the actual api error response to show more specific messages
             const updatedStudents = students.map((student) =>
                 student.id === editingStudentID ? { ...student, ...formData } : student

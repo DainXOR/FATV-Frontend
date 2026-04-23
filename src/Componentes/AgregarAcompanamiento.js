@@ -279,8 +279,8 @@ const handleSubmit = async (/** @type {{ preventDefault: () => void; }} */ e) =>
         id_companion: formData.professional,
         id_session_type: formData.type,
         session_notes: formData.observations,
-        id_vulnerability_type: "",
-        id_contact_reason: "",
+        id_vulnerability_type: "69e9522bf242f1dfc1448fb5", // #TODO: Esto debería ser un dropdown también, pero por ahora se deja fijo
+        id_contact_reason: "68e3f0806510b642a5c48829", // #TODO: Esto debería ser un dropdown también, pero por ahora se deja fijo
         status: SessionStatus.PENDING,
         date: `${fullDate}T${fullTime}:00`,
       };
