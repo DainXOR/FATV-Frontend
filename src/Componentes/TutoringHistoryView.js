@@ -13,6 +13,7 @@ import SessionsApi from '../api/SessionsApi';
 
 /**
  * @typedef {import("../Models/SessionModels").SessionResult} SessionResult
+ * @typedef {import("../Models/SessionModels").SessionRequest} SessionRequest
  * @typedef {import("../Models/SessionModels").SessionTypeResult} SessionTypeResult
  */
 
@@ -157,9 +158,11 @@ const TutoringHistoryView = () => {
   
 
   // Función para actualizar el estado de la sesión
-  const updateSessionStatus = async (sessionId, newStatus) => {
+  const updateSessionStatus = async (sessionId, session, newStatus) => {
     try {
-      const response = await SessionsApi.updateById(sessionId, newStatus);
+      /** @type {SessionRequest} */
+      session.status = newStatus;
+      const response = await SessionsApi.updateById(sessionId, session); // aqui
       // Actualizar el estado local
       const updatedSessions = sessions.map((session) =>
         session.id === sessionId ? { ...session, status: newStatus } : session
@@ -191,8 +194,10 @@ const TutoringHistoryView = () => {
   };
 
   const handleStatusSave = async (sessionId) => {
-    if (tempStatus !== sessions.find(s => s.id === sessionId)?.status) {
-      await updateSessionStatus(sessionId, tempStatus);
+    const session = sessions.find(s => s.id === sessionId);
+
+    if (tempStatus !== session.status) {
+      await updateSessionStatus(sessionId, session, tempStatus);
     }
     setEditingStatus(null);
     setTempStatus('');
@@ -207,24 +212,13 @@ const TutoringHistoryView = () => {
   const fetchStudentStats = async (studentId, studentName) => {
     try {
       setLoadingStats(true);
-      const token = localStorage.getItem('token');
-      // Old axios call (commented for reference)
-      /*
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/v2/sessions/student/${studentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const studentSessions = response.data.data || [];
-      */
-      // New API call
-      const SupportApi = (await import('../api/SupportApi')).default;
-      SupportApi.setAuthToken && SupportApi.setAuthToken(token);
-      const response = await SupportApi.getStudentSessions(studentId);
-      const studentSessions = response.data?.data || [];
+      
+      const response = await SessionsApi.getByStudentId(studentId);
+      if (!response.ok) {
+        throw new Error(response.error.message || 'Error al cargar estadísticas del estudiante');
+      }
+
+      const studentSessions = response.body.data;
       const statsMap = {};
       studentSessions.forEach(session => {
         const sessionTypeName = sessionTypes.find(type => type.id === session.id_session_type)?.name || 'No definido';

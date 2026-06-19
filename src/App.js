@@ -1,16 +1,9 @@
 /* Componente para registrar estudiantes. Aquí se encuentra toda la lógica de la visualización del form */
-import React, { useState } from 'react';
-import axios from 'axios';
 import './Estilos/Datoscontacto.css';
 import './index.css';
 import Botones from './Componentes/Botones';
-import StudentTable from './Componentes/StudentTable';
 import UserInfoBar from './Componentes/UserInfoBar';
-import AgregarAcompañamiento from './Componentes/AgregarAcompanamiento';
-import FormCreator from './Componentes/FormCreator';
 import StudentForm from './Componentes/StudentForm';
-import Swal from 'sweetalert2';
-import TutoringHistoryView from './Componentes/TutoringHistoryView';
 import './Estilos/TutoringHistoryView.css';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 import RegisterStudentPage from './pages/RegisterStudentPage';
