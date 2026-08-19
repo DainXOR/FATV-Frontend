@@ -6,18 +6,38 @@
  */
 
 /**
+ * @typedef {"academic" | "socioeconomic" | "relacional" | "socioemotional"} SectionType
+ */
+
+/**
  * @typedef {Object} QuestionInfo
  * @property {string} id_question
  * @property {number} position
- * @property {number} section
  * @property {number} weight
  * @property {boolean} optional
  * @property {ParentQuestion} parent
  */
 
 /**
+ * Section metadata stored by section position.
+ * @typedef {Object} SectionInfo
+ * @property {string} name
+ * @property {number} weight
+ */
+
+/**
+ * In-form section position -> list of questions in that section.
+ * @typedef {{[sectionPosition: number]: QuestionInfo[]}} Sections
+ */
+
+/**
+ * In-form section position -> section metadata.
+ * @typedef {{[sectionPosition: number]: SectionInfo}} SectionsInfo
+ */
+
+/**
  * Question ID -> answer value
- * @typedef {Record<string, string>} Answers
+ * @typedef {{[QuestionID: string]: string}} Answers
  */
 
 /**
@@ -34,6 +54,9 @@
  * @property {string} description
  * @property {string} date
  * @property {QuestionInfo[]} questions_info
+ * @property {Sections} sections
+ * @property {SectionsInfo} sections_info
+ * @property {boolean} positions_are_global
  */
 /**
  * @typedef {Object} FormResult
@@ -42,6 +65,9 @@
  * @property {string} description
  * @property {string} date
  * @property {QuestionInfo[]} questions_info
+ * @property {Sections} sections
+ * @property {SectionsInfo} sections_info
+ * @property {boolean} positions_are_global
  * @property {string} created_at
  * @property {string} updated_at
  */

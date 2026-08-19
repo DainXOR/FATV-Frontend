@@ -1,80 +1,151 @@
-/*Diseño de los botones*/
+/* ============================================================
+   Sidebar nav — Fundación Antivirus
+   Tokens from brand guide:
+   #32526E deep slate (container)  #222D56 darkest (active state)
+   #7C76B5 primary accent          #708BC6 secondary accent
+   #DCEBF9 light hover              #FFBA08 highlight (used sparingly)
+   ============================================================ */
 
-.button-container {
+.sidebar-nav {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 40px;
-  font-family: Arial;
-  color: white;
-  padding: 30px;
+  gap: 6px;
+  padding: 16px 12px;
+  font-family: 'Myriad Pro', 'Segoe UI', Arial, sans-serif;
+  transition: padding 0.3s ease, gap 0.3s ease;
 }
 
-.button-item {
+.sidebar-nav.collapsed {
+  padding: 16px 8px;
+  gap: 10px;
+}
+
+/* ---- Row ---- */
+.nav-row {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  padding: 30px;
-  width: 280px;
-}
-
-.button {
-  padding: 12px 30px;
-  background-color: #FFBA08 !important;
-  color: white;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 16px 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #DCEBF9;
+  text-align: left;
   cursor: pointer;
-  border-radius: 5px;
-  transition: background-color 0.2s ease-in-out;
+  font: inherit;
+  transition: background-color 0.2s ease, padding 0.3s ease, gap 0.3s ease;
 }
 
-.button:hover {
-  background-color: #17a55f;
-  color: white;
+.nav-row:hover {
+  background-color: rgba(220, 235, 249, 0.1);
 }
 
-.images {
-  width: 60px;
-  height: 60px;
-  margin-bottom: 20px;
+.nav-row:focus-visible {
+  outline: 2px solid #FFBA08;
+  outline-offset: 2px;
 }
 
-.button-title {
-  color: white;
-  font-family: Arial;
-  font-size: 20px;
-  font-weight: bold;
-  margin: 15px 0 12px 0;
-  text-align: center;
+.nav-row.active {
+  background-color: #222D56;
 }
 
-.button-description {
-  color: white;
-  font-family: Arial;
-  font-size: 18px;
-  margin: 0 0 20px 0;
-  text-align: center;
-  line-height: 1.4;
+/* left accent bar — the signature element */
+.nav-row-accent {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 3px;
+  background: transparent;
+  transition: background-color 0.2s ease, width 0.2s ease;
 }
 
+.nav-row:hover .nav-row-accent {
+  background-color: #708BC6;
+}
+
+.nav-row.active .nav-row-accent {
+  background-color: #7C76B5;
+  width: 4px;
+}
+
+/* ---- Icon ---- */
+.nav-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+/* ---- Copy ---- */
+.nav-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  max-width: 220px;
+  transition: opacity 0.2s ease, max-width 0.3s ease;
+}
+
+.nav-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.nav-description {
+  font-size: 12px;
+  font-weight: 400;
+  color: #DCEBF9;
+  opacity: 0.75;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* ---- Collapsed state ---- */
+.sidebar-nav.collapsed .nav-row {
+  justify-content: center;
+  gap: 0;
+  padding: 10px;
+  min-height: 52px;
+}
+
+.sidebar-nav.collapsed .nav-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.sidebar-nav.collapsed .nav-copy {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
+
+/* ---- Small screens ---- */
 @media (max-width: 600px) {
-  .images {
-    width: 40px;
-    height: 40px;
+  .nav-row {
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 10px;
   }
-  
-  .button-item {
-    width: 180px;
-    padding: 15px;
+  .nav-icon {
+    width: 26px;
+    height: 26px;
   }
-  
-  .button-title {
-    font-size: 14px;
+  .nav-title {
+    font-size: 13px;
   }
-  
-  .button-description {
+  .nav-description {
     font-size: 11px;
   }
 }

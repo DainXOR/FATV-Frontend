@@ -1,4 +1,5 @@
 /* Componente para registrar estudiantes. Aquí se encuentra toda la lógica de la visualización del form */
+import './fonts.css';
 import './Estilos/Datoscontacto.css';
 import './index.css';
 import Botones from './Componentes/Botones';
@@ -16,6 +17,7 @@ import HomePage from './pages/HomePage';
 import { AuthProvider, useAuth } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import { config } from "./utils/config";
+import { useState } from 'react';
 
 /*El back debe regresar en esta sección el nombre y rol de la persona que ingresó. De momento, se hace de forma local */
 console.log("Back url: " + config.backendUrl)
@@ -23,6 +25,7 @@ console.log("Back url: " + config.backendUrl)
 // Helper: Wrapper for sidebar and main content
 const MainLayout = ({ user }) => {
     const navigate = useNavigate();
+    const [collapsed, setCollapsed] = useState(true);
     // Only logo navigates to dashboard root
     const goTo = (/** @type {string} */ view) => {
         if (view === 'register') navigate('/dashboard/register', 'replace');
@@ -33,10 +36,13 @@ const MainLayout = ({ user }) => {
     };
     return (
         <div className="contact-form-container">
-            <div className="container-form">
-                <div className="sidebar">
+            <div className={`container-form ${collapsed ? 'sidebar-collapsed' : ''}`}>
+                <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}
+                    onMouseEnter={() => setCollapsed(false)}
+                    onMouseLeave={() => setCollapsed(true)}
+                >
                     <img src="/logo1.png" className="logo" alt="logo" style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard', 'replace')} />
-                    <Botones onNavigate={goTo} />
+                    <Botones onNavigate={goTo} collapsed={collapsed} />
                 </div>
                 <div className="form-grid">
                     <div className="main-container">

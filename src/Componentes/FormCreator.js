@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import '../Estilos/FormCreator.css';
 import { Button } from '@mui/material';
 import FormApi from '../api/FormsApi.js';
-import StudentsApi from '../api/StudentsApi.js';
 import Swal from 'sweetalert2';
+import {
+  INITIAL_SECTION_WEIGHTS,
+  INITIAL_QUESTION_WEIGHT,
+} from '../config/FormCreatorConfig.js';
 
 /**
  * @typedef {import("../Models/StudentModels.js").StudentResult} StudentResult
@@ -11,6 +14,11 @@ import Swal from 'sweetalert2';
  * @typedef {import("../Models/FormModels.js").FormRequest} FormRequest
  * @typedef {import("../Models/FormModels.js").FormQuestionRequest} FormQuestionRequest
  * @typedef {import("../Models/FormModels.js").FormQuestionOption} FormQuestionOption
+ * @typedef {import("../Models/FormModels.js").QuestionInfo} QuestionInfo
+ */
+
+/**
+ * @typedef {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} QuestionType
  */
 
 /**
@@ -19,14 +27,14 @@ import Swal from 'sweetalert2';
  * @property {string} id - Unique identifier (client-generated timestamp)
  * @property {string} name - Question name
  * @property {string} question - Question text
- * @property {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} type - Question type
+ * @property {QuestionType} type - Question type
  * @property {FormQuestionOption[]} options - Answer options for choice/multiple questions
  */
 
 /**
  * Configuration for a selected question's answer format.
  * @typedef {Object} ConfiguredQuestion
- * @property {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} type - Question type
+ * @property {QuestionType} type - Question type
  * @property {string[]} options - Answer options for choice/multiple questions
  */
 
@@ -42,9 +50,42 @@ import Swal from 'sweetalert2';
  */
 
 /**
+ * @typedef {import("../Models/FormModels.js").SectionType} SectionType
+ */
+
+/**
+ * Relative weight used to derive a question's percentage share within its scope
+ * (global form, or its section, depending on `positionsAreGlobal`). Percentages
+ * are always derived at render/submit time as weight / sum(weights in scope),
+ * so they can never fail to add up to 100%.
+ *
+ * @typedef {Object} QuestionConfig
+ * @property {SectionType} section
+ * @property {boolean} optional
+ * @property {string} parentQuestionId
+ * @property {string[]} neededAnswers
+ * @property {number} weight - Raw relative weight inside their section
+ */
+
+/**
+ * @typedef {{[questionId: string]: QuestionConfig}} QuestionConfigMap
+ */
+
+/**
+ * @typedef {Object} SelectedQuestionPayload
+ * @property {string} id
+ * @property {string} name
+ * @property {string} question
+ * @property {QuestionType} type
+ * @property {FormQuestionOption[]} options
+ * @property {QuestionConfig} config
+ */
+
+
+/**
  * Maps frontend question type to backend ID.
  *
- * @param {'text' | 'single_choice' | 'multiple_choice' | 'true_false'} type - The frontend type ('text', 'single_choice', 'multiple_choice', 'true_false').
+ * @param {QuestionType} type - The frontend type ('text', 'single_choice', 'multiple_choice', 'true_false').
  * @returns {string} The backend ID for the type.
  */
 const mapTypeToBackend = (type) => {
@@ -80,6 +121,22 @@ const getReadableQuestionType = (/** @type {String} */ backendId) => {
   }
 };
 
+const sectionOptions = [
+  { value: 'academic', label: 'Académico' },
+  { value: 'socioeconomic', label: 'Socioeconómico' },
+  { value: 'relacional', label: 'Relacional' },
+  { value: 'socioemotional', label: 'Socioemocional' }
+];
+
+const defaultSectionOrder = /** @type {SectionType[]} */ ([
+  'academic',
+  'socioeconomic',
+  'relacional',
+  'socioemotional'
+]);
+
+const defaultSectionWeights = INITIAL_SECTION_WEIGHTS;
+
 const hasOptions = (/** @type {FormQuestionResult} */ q) => {
   const type = mapBackendToType(q.id_question_type);
   return type !== 'text' && (q.options || []).length > 0;
@@ -93,20 +150,25 @@ const hasOptions = (/** @type {FormQuestionResult} */ q) => {
  * @returns {React.JSX.Element}
  */
 const FormCreator = ({ onBack }) => {
-  const [questions, setQuestions] = useState(/** @type {FormQuestionResult[]} */([])); 
-  const [selectedQuestionIDs, setSelected] = useState(() => questions.map(q => q.id));
+  const [questions, setQuestions] = useState(/** @type {FormQuestionResult[]} */([]));
+  const [selectedQuestionIDs, setSelectedQuestionIDs] = useState(/** @type {string[]} */([]));
+  const [selectedQuestionConfigs, setSelectedQuestionConfigs] = useState(/** @type {QuestionConfigMap} */ ({}));
+  const [positionsAreGlobal, setPositionsAreGlobal] = useState(/** @type {boolean} */ (true));
+  const [sectionOrder, setSectionOrder] = useState(/** @type {SectionType[]} */ (defaultSectionOrder));
+  const questionNodeRefs = useRef(/** @type {Map<string, HTMLDivElement>} */ (new Map()));
+  const sectionNodeRefs = useRef(/** @type {Map<SectionType, HTMLDivElement>} */ (new Map()));
+  const pendingFlip = useRef(/** @type {'question'|'section'|null} */ (null));
+  const oldPositions = useRef({
+    questions: /** @type {Map<string, DOMRect>} */ (new Map()),
+    sections: /** @type {Map<SectionType, DOMRect>} */ (new Map())
+  });
   const [questionFilterText, setQuestionFilterText] = useState('');
   const [questionFilterType, setQuestionFilterType] = useState('all');
   const [mode, setMode] = useState(/** @type {'select' | 'create-custom'} */('select')); 
   const [formError, setFormError] = useState(/** @type {string | null} */(null));
   const [formSuccess, setFormSuccess] = useState(/** @type {string | null} */(null));
-  const [students, setStudents] = useState(/** @type {LocalStudent[]} */([]));
-  const [selectedStudent, setSelectedStudent] = useState(/** @type {LocalStudent | null} */(null));
-  const [searchTerm, setSearchTerm] = useState(/** @type {string} */(''));
-  const [showSuggestions, setShowSuggestions] = useState(/** @type {boolean} */(false));
   const [generatedUrl, setGeneratedUrl] = useState(/** @type {string | null} */(null));
   const [isGenerating, setIsGenerating] = useState(/** @type {boolean} */(false));
-  const suggestionsRef = useRef(/** @type {HTMLDivElement | null} */(null));
 
   // Single manual question editor (used only in create-custom mode)
   const [manualQuestion, setManualQuestion] = useState(/** @type {ReadableQuestion} */ ({
@@ -116,6 +178,12 @@ const FormCreator = ({ onBack }) => {
     type: 'text',
     options: [] 
   }));
+
+  const [formName, setFormName] = useState(/** @type {string} */(''));
+  const [formDescription, setFormDescription] = useState(/** @type {string} */(''));
+  const [sectionWeights, setSectionWeights] = useState(/** @type {{[K in SectionType]: number}} */ (
+    defaultSectionWeights
+  ));
 
   const startCreateQuestion = () => {
     setManualQuestion({ id: `m${Date.now()}`, name: '', question: '', type: 'text', options: [] });
@@ -158,8 +226,9 @@ const FormCreator = ({ onBack }) => {
       Swal.fire('Guardado', 'Pregunta guardada correctamente', 'success');
       setMode('select');
     } catch (err) {
-      console.error(err);
-      Swal.fire('Error', err.message || 'No se pudo guardar la pregunta', 'error');
+      const caught = /** @type {any} */ (err);
+      console.error(caught);
+      Swal.fire('Error', caught.message || 'No se pudo guardar la pregunta', 'error');
     }
   };
 
@@ -190,10 +259,20 @@ const FormCreator = ({ onBack }) => {
       const res = await FormApi.Questions().deleteById(q.id);
       if (!res.ok) throw new Error(res.error?.message || 'Error eliminando pregunta');
       setQuestions(prev => prev.filter(item => item.id !== q.id));
-      setSelected(prev => prev.filter(id => id !== q.id));
+      setSelectedQuestionIDs(prev => prev.filter(id => id !== q.id));
+      setSelectedQuestionConfigs(prev => {
+        const { [q.id]: removed, ...rest } = prev;
+        return Object.fromEntries(Object.entries(rest).map(([questionId, config]) => {
+          if (config.parentQuestionId === q.id) {
+            return [questionId, { ...config, parentQuestionId: '', neededAnswers: [] }];
+          }
+          return [questionId, config];
+        }));
+      });
     } catch (err) {
-      console.error(err);
-      Swal.fire('Error', err.message || 'No se pudo eliminar la pregunta', 'error');
+      const caught = /** @type {any} */ (err);
+      console.error(caught);
+      Swal.fire('Error', caught.message || 'No se pudo eliminar la pregunta', 'error');
     }
   };
 
@@ -242,15 +321,206 @@ const FormCreator = ({ onBack }) => {
     });
   };
 
-  /**
-   * Toggles the selection of a question by its ID.
-   *
-   * @param {string} id - The ID of the question to toggle.
-   */
-  const toggleQuestion = (id) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  const getDefaultQuestionConfig = (/** @type {string} */ questionId) => ({
+    section: 'academic',
+    optional: false,
+    parentQuestionId: '',
+    neededAnswers: [],
+    weight: INITIAL_QUESTION_WEIGHT
+  });
+
+  const getSectionWeightPercentage = (/** @type {SectionType} */ sectionType) => {
+    const total = sectionOrder.reduce(
+      (sum, type) => sum + (Number(sectionWeights[type]) || 0),
+      0
     );
+
+    if (total <= 0) return 0;
+
+    return Math.round(
+      ((Number(sectionWeights[sectionType]) || 0) / total) * 100 * 100
+    ) / 100;
+  };
+
+
+  ///**
+  // * Returns the raw relative weight for the currently active scope
+  // * (global form order vs. grouped-by-section order).
+  // *
+  // * @param {QuestionConfig} config
+  // * @returns {number}
+  // */
+
+  //const getActiveWeight = (config) => {
+  //  return typeof config.weight === 'number' && !Number.isNaN(config.weight) ? config.weight : 0;
+  //};
+
+  
+
+  const getSelectedQuestionObjects = () => {
+    return /** @type {FormQuestionResult[]} */ (selectedQuestionIDs
+      .map(id => questions.find(q => q.id === id))
+      .filter((q) => q != null));
+  };
+
+  const normalizeNeededAnswers = (/** @type {string} */ raw) => {
+    return raw
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean);
+  };
+
+  const isSingleAnswerType = (/** @type {QuestionType} */ type) => {
+    return type === 'single_choice' || type === 'true_false';
+  };
+
+  const isOpenAnswerType = (/** @type {QuestionType} */ type) => {
+    return type === 'text';
+  };
+  const isMultiAnswerType = (/** @type {QuestionType} */ type) => {
+    return type === 'multiple_choice';
+  };
+
+  const getQuestionTypeById = (/** @type {string} */ questionId) => {
+    const question = questions.find(q => q.id === questionId);
+    return question ? mapBackendToType(question.id_question_type) : 'text';
+  };
+
+  /**
+   * @param {'question' | 'section'} type
+   */
+  const capturePositions = (type) => {
+    const result = new Map();
+    const refsMap = type === 'question' ? questionNodeRefs.current : sectionNodeRefs.current;
+    refsMap.forEach((node, key) => {
+      if (node) {
+        result.set(key, node.getBoundingClientRect());
+      }
+    });
+    return result;
+  };
+
+  /**
+   * @param {'question' | 'section'} type
+   */
+  const animateFlip = (type) => {
+    const refsMap = type === 'question' ? questionNodeRefs.current : sectionNodeRefs.current;
+    const sourceRects = type === 'question' ? oldPositions.current.questions : oldPositions.current.sections;
+
+    refsMap.forEach((node, key) => {
+      const oldRect = sourceRects.get(key);
+      if (!oldRect) return;
+      const newRect = node.getBoundingClientRect();
+      const deltaX = oldRect.left - newRect.left;
+      const deltaY = oldRect.top - newRect.top;
+
+      if (deltaX === 0 && deltaY === 0) return;
+      node.style.transition = 'none';
+      node.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+      node.style.willChange = 'transform';
+      node.getBoundingClientRect();
+      requestAnimationFrame(() => {
+        node.style.transition = 'transform 280ms ease';
+        node.style.transform = '';
+      });
+      const cleanup = () => {
+        node.style.transition = '';
+        node.style.transform = '';
+        node.style.willChange = '';
+        node.removeEventListener('transitionend', cleanup);
+      };
+      node.addEventListener('transitionend', cleanup);
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (pendingFlip.current === 'question') {
+      animateFlip('question');
+      pendingFlip.current = null;
+      oldPositions.current.questions.clear();
+    }
+    if (pendingFlip.current === 'section') {
+      animateFlip('section');
+      pendingFlip.current = null;
+      oldPositions.current.sections.clear();
+    }
+  }, [selectedQuestionIDs, sectionOrder, positionsAreGlobal, selectedQuestionConfigs]);
+
+  const updateQuestionConfig = (/** @type {string} */ questionId, /** @type {Partial<QuestionConfig>} */ changes) => {
+    const currentConfig = selectedQuestionConfigs[questionId] || getDefaultQuestionConfig(questionId);
+    if (changes.section !== undefined && changes.section !== currentConfig.section) {
+      oldPositions.current.questions = capturePositions('question');
+      pendingFlip.current = 'question';
+    }
+
+    setSelectedQuestionConfigs(prev => {
+      const nextConfig = {
+        ...getDefaultQuestionConfig(questionId),
+        ...prev[questionId],
+        ...changes,
+      };
+
+      const parentType = nextConfig.parentQuestionId
+        ? getQuestionTypeById(nextConfig.parentQuestionId)
+        : null;
+
+      if (parentType && isOpenAnswerType(parentType)) {
+        nextConfig.neededAnswers = [];
+      }
+
+      if (parentType && isSingleAnswerType(parentType) && nextConfig.neededAnswers.length > 1) {
+        nextConfig.neededAnswers = [nextConfig.neededAnswers[0]];
+      }
+
+      return {
+        ...prev,
+        [questionId]: nextConfig,
+      };
+    });
+  };
+
+  const moveQuestion = (/** @type {string} */ id, /** @type {'up'|'down'} */ direction) => {
+    oldPositions.current.questions = capturePositions('question');
+    pendingFlip.current = 'question';
+    setSelectedQuestionIDs(prev => {
+      const currentIndex = prev.indexOf(id);
+      if (currentIndex === -1) return prev;
+      const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const nextState = [...prev];
+      [nextState[currentIndex], nextState[nextIndex]] = [nextState[nextIndex], nextState[currentIndex]];
+      return nextState;
+    });
+  };
+
+  const toggleQuestion = (/** @type {string} */ id) => {
+    setSelectedQuestionIDs(prev => {
+      if (prev.includes(id)) {
+        // Removing a question — weights are relative, so nothing else needs
+        // to change: everyone else's share of 100% grows automatically
+        // because the denominator (sum of weights) shrinks.
+        const next = prev.filter(x => x !== id);
+        setSelectedQuestionConfigs(prevConfig => {
+          const { [id]: removed, ...rest } = prevConfig;
+          return Object.fromEntries(Object.entries(rest).map(([questionId, config]) => {
+            if (config.parentQuestionId === id) {
+              return [questionId, { ...config, parentQuestionId: '', neededAnswers: [] }];
+            }
+            return [questionId, config];
+          }));
+        });
+        return next;
+      }
+
+      // Adding a new question — give it the default raw weight; existing
+      // questions' raw weights are untouched, their computed % simply shifts
+      // to make room since the denominator grows.
+      setSelectedQuestionConfigs(prevConfig => ({
+        ...prevConfig,
+        [id]: prevConfig[id] || getDefaultQuestionConfig(id)
+      }));
+      return [...prev, id];
+    });
   };
 
   /**
@@ -272,76 +542,206 @@ const FormCreator = ({ onBack }) => {
    *     → manualQuestions might be typed incorrectly in useState (shows 'never')
    *     → Actually contains UserCreatedQuestion objects at runtime
    *
-   * @returns {(ReadableQuestion)[]} The array of question payloads.
+   * @returns {SelectedQuestionPayload[]} The array of question payloads.
    */
   const buildQuestionsPayload = () => {
-    return questions.filter(q => selectedQuestionIDs.includes(q.id)).map(q => ({
+    return /** @type {SelectedQuestionPayload[]} */ (getSelectedQuestionObjects().map(q => ({
       id: q.id,
       name: q.name,
       question: q.question,
       type: mapBackendToType(q.id_question_type),
-      options: q.options
-    }));
+      options: q.options || [],
+      config: selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id)
+    })));
+  };
+
+  /**
+   * Gets all questions in a given section from the current selection.
+   *
+   * @param {SectionType} sectionType - The section to filter by
+   * @returns {FormQuestionResult[]} Questions in that section
+   */
+  const getQuestionsInSection = (sectionType) => {
+    return selectedQuestionIDs
+      .map(id => questions.find(q => q.id === id))
+      .filter(q => q != null)
+      .filter(q => {
+        const config = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
+        return config.section === sectionType;
+      });
+  };
+
+  /**
+   * Computes the normalized percentage for a question given the raw weights
+   * of every question sharing its scope (global list, or its section).
+   *
+   * @param {FormQuestionResult} question
+   * @param {FormQuestionResult[]} scopeQuestions - All questions sharing this weight scope
+   * @returns {number} Percentage (0-100), rounded to 2 decimals
+   */
+  const getComputedPercentage = (question, scopeQuestions) => {
+    const config = selectedQuestionConfigs[question.id] || getDefaultQuestionConfig(question.id);
+    const totalWeight = scopeQuestions.reduce((sum, q) => {
+      const c = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
+      return sum + c.weight;
+    }, 0);
+
+    if (totalWeight <= 0) return 0;
+    return Math.round((config.weight / totalWeight) * 100 * 100) / 100;
+  };
+
+  /**
+   * Returns a human-readable label of what % a question currently represents,
+   * within its scope (whole form if global, its section if grouped).
+   *
+   * @param {FormQuestionResult} question
+   * @param {SectionType} sectionType
+   * @returns {string}
+   */
+  const getWeightHint = (question, sectionType) => {
+    const scopeQuestions = getQuestionsInSection(sectionType);
+
+    if (scopeQuestions.length === 0) return 'Sin preguntas en esta sección';
+
+    const percentage = getComputedPercentage(question, scopeQuestions);
+    const scopeLabel = positionsAreGlobal ? 'de su sección' : 'de la sección';
+    return `Equivale a ${percentage}% ${scopeLabel}`;
   };
 
   const prepareInputs = () => {
     const questionsPayload = buildQuestionsPayload();
 
-    if (!selectedStudent) {
-      const error = new Error('Seleccione un estudiante antes de generar el URL.');
-      error.code = 'NO_STUDENT';
-      throw error;
-    }
     if (!questionsPayload.length) {
-      const error = new Error('Agregue al menos una pregunta con texto antes de generar el URL.');
+      const error = /** @type {Error & { code?: string }} */ (new Error('Agregue al menos una pregunta con texto antes de generar el URL.'));
       error.code = 'NO_QUESTIONS';
       throw error;
+    }
+
+
+    for (const item of questionsPayload) {
+      const config = item.config || getDefaultQuestionConfig(item.id);
+      if (!config.parentQuestionId) continue;
+
+      const parentType = getQuestionTypeById(config.parentQuestionId);
+      if (isOpenAnswerType(parentType) && config.neededAnswers.length > 0) {
+        const error = /** @type {Error & { code?: string }} */ (new Error('La pregunta previa es de texto abierto y no puede tener respuestas necesarias.'));
+        error.code = 'INVALID_PARENT_ANSWER';
+        throw error;
+      }
+      if (isSingleAnswerType(parentType) && config.neededAnswers.length !== 1) {
+        const error = /** @type {Error & { code?: string }} */ (new Error('La pregunta previa admite solo una respuesta necesaria.'));
+        error.code = 'INVALID_PARENT_ANSWER';
+        throw error;
+      }
+      if (isMultiAnswerType(parentType) && config.neededAnswers.length < 1) {
+        const error = /** @type {Error & { code?: string }} */ (new Error('La pregunta previa debe tener una o más respuestas necesarias.'));
+        error.code = 'INVALID_PARENT_ANSWER';
+        throw error;
+      }
     }
 
     return questionsPayload;
   };
 
-  const buildFormPayload = (/** @type {any[]} */ questionsPayload) => {
-    // Previously:
-    // const formPayload = { ... } from the old code block with questions_info mapping
+  const moveSection = (/** @type {SectionType} */ sectionType, /** @type {'up' | 'down'} */ direction) => {
+    oldPositions.current.sections = capturePositions('section');
+    pendingFlip.current = 'section';
+    setSectionOrder(prev => {
+      const index = prev.indexOf(sectionType);
+      if (index === -1) return prev;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const getSectionNumber = (/** @type {SectionType} */ sectionType) => {
+    const index = sectionOrder.indexOf(sectionType);
+    return index >= 0 ? index + 1 : 1;
+  };
+
+  const buildFormPayload = (/** @type {SelectedQuestionPayload[]} */ questionsPayload) => {
+    const sectionGroups = /** @type {{[sectionPosition: number]: QuestionInfo[]}} */ ({
+      1: [],
+      2: [],
+      3: [],
+      4: []
+    });
+
+    // Question weights are stored and submitted as their actual raw values.
+    // Percentages are only calculated for display in the UI.
+    const sectionMetadata = sectionOrder.reduce((acc, sectionType, index) => {
+      acc[index + 1] = {
+        name: getSectionLabel(sectionType),
+        weight: sectionWeights[sectionType] ?? 0
+      };
+      return acc;
+    }, /** @type {{[sectionPosition: number]: import("../Models/FormModels.js").SectionInfo}} */ ({
+      1: { name: 'Académico', weight: 0 },
+      2: { name: 'Socioeconómico', weight: 0 },
+      3: { name: 'Relacional', weight: 0 },
+      4: { name: 'Socioemocional', weight: 0 }
+    }));
+
+    const questionsInfo = questionsPayload.map((q, index) => {
+        const config = q.config || getDefaultQuestionConfig(q.id);
+        const sectionType = config.section;
+        const sectionPosition = getSectionNumber(sectionType);
+        const sectionList = sectionGroups[sectionPosition] || [];
+        const position = positionsAreGlobal
+          ? index + 1
+          : sectionList.length + 1;
+
+        // IMPORTANT:
+        // Send the raw question weight to the backend.
+        // Do not normalize it to a percentage.
+        const rawWeight = config.weight;
+
+        const questionInfo = /** @type {QuestionInfo} */ ({
+          position,
+          id_question: q.id,
+          weight: rawWeight,
+          optional: config.optional || false,
+          parent: {
+            id_question: config.parentQuestionId || '',
+            needed_answers: config.neededAnswers || []
+          }
+        });
+
+        sectionGroups[sectionPosition] = [
+          ...sectionList,
+          questionInfo
+        ];
+
+        return questionInfo;
+      }
+    );
+
     return {
-      name: `Caracterización para ${selectedStudent?.first_name}`,
-      description: 'Diligencia esta caracterización para conocerte mejor',
+      name: formName.trim(),
+      description: formDescription.trim(),
       date: new Date().toISOString(),
-      questions_info: questionsPayload.map((/** @type {{ id: any; }} */ q, /** @type {number} */ index) => ({
-        position: index + 1,
-        section: 1,
-        id_parent_question: '',
-        needed_answers: [],
-        id_question: q.id,
-        optional: false,
-      })),
+      sections: sectionGroups,
+      sections_info: sectionMetadata,
+      positions_are_global: positionsAreGlobal,
+      questions_info: questionsInfo,
     };
   };
 
-  const submitForm = async (/** @type {(import("../Models/FormModels.js").FormQuestionResult | ReadableQuestion)[]} */ questionsPayload, /** @type {{ name: string; description: string; date: string; questions_info: any; }} */ formPayload) => {
-    // Old “create questions + post form” logic in detail is preserved in comments below.
-    // The new flow is one-shot for readability.
-
-    // 1. create or update questions (either select or create-custom)
-    // if mode === 'create-custom', the original loop sent each question to /forms/questions
-    // and built a newQuestionsPayload with returned IDs.
-
-    // 2. submit final form payload via FormApi.create()
-
-    const finalPayload = formPayload;
-
-    const response = await FormApi.create(finalPayload);
+  const submitForm = async (/** @type {FormRequest} */ formPayload) => {
+    const response = await FormApi.create(formPayload);
     if (!response.ok) {
-      const error = new Error(response.error?.message || 'Error al crear formulario');
+      const error = /** @type {Error & { code?: string | number; details?: any }} */ (new Error(response.error?.message || 'Error al crear formulario'));
       error.code = response.status;
       error.details = response.error;
       throw error;
     }
 
-    const newFormId = response.body?.data?.id || response.body?.id;
+    const newFormId = response.body.data.id;
     if (!newFormId) {
-      const error = new Error('El backend no devolvió un ID de formulario.');
+      const error = /** @type {Error & { code?: string }} */ (new Error('El backend no devolvió un ID de formulario.'));
       error.code = 'MISSING_ID';
       throw error;
     }
@@ -358,7 +758,7 @@ const FormCreator = ({ onBack }) => {
     try {
       const questionsPayload = prepareInputs();
       const formPayload = buildFormPayload(questionsPayload);
-      const newFormId = await submitForm(questionsPayload, formPayload);
+      const newFormId = await submitForm(formPayload);
 
       const studentFormUrl = `${window.location.origin}/student-form/${newFormId}`;
       setGeneratedUrl(studentFormUrl);
@@ -372,9 +772,10 @@ const FormCreator = ({ onBack }) => {
         confirmButtonColor: '#673ab7',
       });
     } catch (error) {
-      const statusCode = error.status || error.code || 'UNKNOWN';
-      const message = error.message || 'Error al generar el formulario';
-      const details = error.details || error;
+      const caught = /** @type {any} */ (error);
+      const statusCode = caught.status || caught.code || 'UNKNOWN';
+      const message = caught.message || 'Error al generar el formulario';
+      const details = caught.details || caught;
 
       console.error('Error al generar URL:', { statusCode, message, details });
       setFormError(message);
@@ -419,34 +820,6 @@ const FormCreator = ({ onBack }) => {
   };
 
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const response = await StudentsApi.getAll();
-
-        if (!response.ok) {
-          throw new Error(response.error?.message || 'Error al cargar estudiantes');
-        }
-
-        const raw = response.body.data || [];
-        const list = (raw || []).map(student => ({
-          id: student.id || Math.random().toString(36).slice(2,9),
-          number_id: student.number_id || '',
-          first_name: student.first_name || '',
-          last_name: student.last_name || '',
-          phone_number: student.phone_number || '',
-          email: student.email || '',
-          fullName: `${(student.first_name || '').trim()} ${(student.last_name || '').trim()}`.trim()
-        }));
-        setStudents(list);
-      } catch (err) {
-        console.error('Error cargando estudiantes:', err);
-        setStudents([]);
-      }
-    };
-    fetchStudents();
-  }, []);
-
-  useEffect(() => {
     const fetchQuestions = async () => {
       try {
         const response = await FormApi.Questions().getAll();
@@ -474,39 +847,6 @@ const FormCreator = ({ onBack }) => {
     fetchQuestions();
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (/** @type {{ target: Node | null; }} */ e) => {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // ==================== HELPER FUNCTIONS FOR CLEANER JSX ====================
-
-  /**
-   * Gets the value to display in the student search input.
-   * Extracted from: value={selectedStudent ? selectedStudent.fullName : searchTerm}
-   */
-  const getSearchInputValue = () => {
-    if (selectedStudent) {
-      return selectedStudent.fullName;
-    }
-    return searchTerm;
-  };
-
-  /**
-   * Gets the email to display in the read-only email field.
-   * Extracted from: value={selectedStudent ? selectedStudent.email : ''}
-   */
-  const getSelectedStudentEmail = () => {
-    if (selectedStudent) {
-      return selectedStudent.email;
-    }
-    return '';
-  };
 
   /**
    * Gets the correct CSS class for mode button.
@@ -518,37 +858,328 @@ const FormCreator = ({ onBack }) => {
     return isActive ? `${baseClass} active` : baseClass;
   };
 
-  /**
-   * Renders student suggestions list.
-   * Extracted to eliminate complex nested JSX with multiple filter() calls.
-   */
-  const renderStudentSuggestions = () => {
-    const filteredStudents = students.filter(s => {
-      const fullName = (s.fullName || '').toLowerCase();
-      const search = (searchTerm || '').toLowerCase();
-      return fullName.includes(search);
-    });
+  const getSectionLabel = (/** @type {SectionType} */ key) => {
+    const section = sectionOptions.find(item => item.value === key);
+    return section ? section.label : key;
+  };
 
-    const visibleStudents = filteredStudents.slice(0, 50);
-    const hasResults = filteredStudents.length > 0;
+  const renderQuestionConfigRow = (/** @type {FormQuestionResult} */ q, /** @type {number} */ index, /** @type {FormQuestionResult[]} */ visibleList) => {
+    const config = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
+    const parentCandidates = visibleList.filter(item => item.id !== q.id);
+    const parentQuestion = questions.find(item => item.id === config.parentQuestionId);
+    const parentQuestionType = parentQuestion ? mapBackendToType(parentQuestion.id_question_type) : null;
+    const parentQuestionOptions = parentQuestion && hasOptions(parentQuestion)
+      ? parentQuestion.options.map(opt => opt.text)
+      : [];
+    const parentIsOpen = parentQuestionType ? isOpenAnswerType(parentQuestionType) : false;
+    const parentIsSingle = parentQuestionType ? isSingleAnswerType(parentQuestionType) : false;
 
     return (
-      <ul className="student-suggestions">
-        {visibleStudents.map(s => (
-          <li 
-            key={s.id} 
-            onMouseDown={() => { 
-              setSelectedStudent(s); 
-              setShowSuggestions(false); 
-              setSearchTerm(''); 
-            }}
+      <div
+        key={q.id}
+        ref={(node) => {
+          if (node) {
+            questionNodeRefs.current.set(q.id, node);
+          } else {
+            questionNodeRefs.current.delete(q.id);
+          }
+        }}
+        className="config-row">
+        <div className="config-question-text">{index + 1}. {q.name}</div>
+
+        <div className="config-fields-row">
+          <div className="config-field">
+            <label>Sección</label>
+            <select
+              value={config.section}
+              className="config-type-select"
+              onChange={(e) => {
+                const newSection = /** @type {SectionType} */ (e.target.value);
+                if (config.section === newSection) return;
+                updateQuestionConfig(q.id, { section: newSection });
+              }}
+            >
+              {sectionOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="config-field config-field-checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={config.optional}
+                onChange={(e) => updateQuestionConfig(q.id, { optional: e.target.checked })}
+              />
+              Opcional
+            </label>
+          </div>
+
+          <div className="config-field">
+            <label>Peso</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={config.weight}
+              className="config-type-select"
+              onChange={(e) => {
+                const parsed = Math.round(Number(e.target.value));
+
+                const nextWeight = Number.isFinite(parsed)
+                  ? Math.min(255, Math.max(1, parsed))
+                  : 1;
+
+                updateQuestionConfig(
+                  q.id,
+                  {weight: nextWeight}
+                );
+              }}
+
+            />
+            <small className="config-help">
+              {getWeightHint(q, config.section)}
+            </small>
+          </div>
+        </div>
+
+        <div className="config-field">
+          <label>Pregunta previa</label>
+          <select
+            value={config.parentQuestionId || ''}
+            className="config-type-select"
+            onChange={(e) => updateQuestionConfig(q.id, {
+              parentQuestionId: e.target.value,
+              neededAnswers: []
+            })}
           >
-            <span className="s-name">{s.fullName || `${s.first_name} ${s.last_name}`}</span>
-            <span className="s-email">{s.email}</span>
-          </li>
-        ))}
-        {!hasResults && <li className="no-students">No se encontraron</li>}
-      </ul>
+            <option value="">Ninguna</option>
+            {parentCandidates.map(item => (
+              <option key={item.id} value={item.id}>{item.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {config.parentQuestionId && (
+          <div className="needed-answers-block">
+            <label>Respuestas necesarias</label>
+            {parentIsOpen ? (
+              <div className="parent-open-warning">
+                Esta pregunta previa es de respuesta abierta. No se requieren respuestas concretas.
+              </div>
+            ) : parentQuestionOptions.length ? (
+              <div className="options-editor">
+                {parentQuestionOptions.map((text, optIndex) => {
+                  const selected = config.neededAnswers.includes(text);
+                  return (
+                    <label key={optIndex} className="option-row">
+                      <input
+                        type={parentIsSingle ? 'radio' : 'checkbox'}
+                        name={`needed-answer-${q.id}`}
+                        checked={selected}
+                        value={text}
+                        onChange={() => {
+                          const nextAnswers = parentIsSingle
+                            ? [text]
+                            : selected
+                              ? config.neededAnswers.filter(item => item !== text)
+                              : [...config.neededAnswers, text];
+                          updateQuestionConfig(q.id, { neededAnswers: nextAnswers });
+                        }}
+                      />
+                      {text}
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="option-input"
+                placeholder="Ej: Sí, No"
+                value={config.neededAnswers.join(', ')}
+                onChange={(e) => updateQuestionConfig(q.id, { neededAnswers: normalizeNeededAnswers(e.target.value) })}
+              />
+            )}
+            <small className="config-help">
+              {parentIsOpen
+                ? 'Las preguntas abiertas no usan valores obligatorios.'
+                : parentIsSingle
+                  ? 'Selecciona una sola respuesta que active esta pregunta.'
+                  : 'Selecciona una o más respuestas que activen esta pregunta.'}
+            </small>
+          </div>
+        )}
+
+        <div className="config-row-actions">
+          <button
+            className="row-move-btn"
+            type="button"
+            onClick={() => moveQuestion(q.id, 'up')}
+            disabled={index === 0}
+          >
+            ↑ Subir
+          </button>
+          <button
+            className="row-move-btn"
+            type="button"
+            onClick={() => moveQuestion(q.id, 'down')}
+            disabled={index === visibleList.length - 1}
+          >
+            ↓ Bajar
+          </button>
+          <button
+            className="remove-question-btn"
+            type="button"
+            onClick={() => toggleQuestion(q.id)}
+          >
+            Quitar de selección
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSelectedQuestionBuilder = () => {
+    const selectedQuestions = getSelectedQuestionObjects();
+
+    const questionsBySection = sectionOrder.reduce((acc, sectionType) => {
+      acc[sectionType] = selectedQuestions.filter(q => {
+        const config = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
+        return config.section === sectionType;
+      });
+      return acc;
+    }, /** @type {{[K in SectionType]: FormQuestionResult[]}} */ ({
+      academic: [],
+      socioeconomic: [],
+      relacional: [],
+      socioemotional: []
+    }));
+
+    return (
+      <div className="selected-config">
+        <div className="selected-config-header">
+          <h4>Configuración del formulario</h4>
+          <span className="mode-badge">
+            {positionsAreGlobal ? 'Modo: Posición global' : 'Modo: Agrupado por sección'}
+          </span>
+        </div>
+
+        {selectedQuestions.length > 0 && (
+          <>
+            <div className="form-meta-row">
+              <input
+                type="text"
+                placeholder="Nombre del formulario"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+              <textarea
+                placeholder="Descripción breve del formulario"
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="section-weights-row">
+              {sectionOrder.map((sectionType) => (
+                <label key={sectionType} className="section-weight-field">
+                  <span>{getSectionLabel(sectionType)} (peso)</span>
+
+                  <input
+                    type="number"
+                    value={sectionWeights[sectionType]}
+                    min={0}
+                    step={1}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+
+                      setSectionWeights(prev => ({
+                        ...prev,
+                        [sectionType]: Number.isFinite(value)
+                          ? Math.min(255, Math.max(0, Math.round(value)))
+                          : 0
+                      }));
+                    }}
+                  />
+
+                  <small className="config-help">
+                    {getSectionWeightPercentage(sectionType)}% del formulario
+                  </small>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="positions-toggle-row">
+          <label>
+            <input
+              type="checkbox"
+              checked={positionsAreGlobal}
+              onChange={(e) => {
+                oldPositions.current.questions = capturePositions('question');
+                pendingFlip.current = 'question';
+                setPositionsAreGlobal(e.target.checked);
+              }}
+            />
+            Posiciones globales dentro del formulario
+          </label>
+          <span className="positions-toggle-hint">
+            {positionsAreGlobal
+              ? 'Las preguntas conservan su orden absoluto dentro del formulario. Los pesos relativos y el % mostrado se calculan sobre todas las preguntas del formulario.'
+              : 'Se agrupan por sección y cada sección tiene su propio orden. Los pesos relativos y el % mostrado se calculan sobre las preguntas de cada sección por separado.'}
+          </span>
+        </div>
+
+        {selectedQuestions.length === 0 ? (
+          <div className="empty-selection-hint">Selecciona preguntas en la lista para configurar secciones, orden y dependencias.</div>
+        ) : (
+          positionsAreGlobal ? (
+            selectedQuestions.map((q, index) => renderQuestionConfigRow(q, index, selectedQuestions))
+          ) : (
+            sectionOrder.map((sectionType, sectionIndex) => {
+              const sectionQuestions = questionsBySection[sectionType];
+              if (!sectionQuestions || !sectionQuestions.length) return null;
+              return (
+                <div
+                  key={sectionType}
+                  ref={(node) => {
+                    if (node) {
+                      sectionNodeRefs.current.set(sectionType, node);
+                    } else {
+                      sectionNodeRefs.current.delete(sectionType);
+                    }
+                  }}
+                  className="section-group">
+                  <div className="section-group-header">
+                    <span>{getSectionLabel(sectionType)}</span>
+                    <span className="section-buttons">
+                      <button
+                        type="button"
+                        className="section-move-btn"
+                        onClick={() => moveSection(sectionType, 'up')}
+                        disabled={sectionIndex === 0}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="section-move-btn"
+                        onClick={() => moveSection(sectionType, 'down')}
+                        disabled={sectionIndex === sectionOrder.length - 1}
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  </div>
+                  {sectionQuestions.map((q, index) => renderQuestionConfigRow(q, index, sectionQuestions))}
+                </div>
+              );
+            })
+          )
+        )}
+      </div>
     );
   };
 
@@ -633,6 +1264,7 @@ const FormCreator = ({ onBack }) => {
             ))}
           </tbody>
         </table>
+        {renderSelectedQuestionBuilder()}
       </>
     );
   };
@@ -647,35 +1279,44 @@ const FormCreator = ({ onBack }) => {
         <h3>Crear pregunta</h3>
         <div className="manual-questions single">
           <div className="manual-question-row">
-            <input
-              type="text"
-              placeholder="Nombre de la pregunta..."
-              value={mq.name}
-              onChange={(e) => setManualQuestion({ ...mq, name: e.target.value })}
-              className="manual-question-name-input"
-            />
-            <input
-              type="text"
-              placeholder="Escribe la pregunta..."
-              value={mq.question}
-              onChange={(e) => setManualQuestion({ ...mq, question: e.target.value })}
-              className="manual-question-input"
-            />
-            <select
-              value={mq.type}
-              onChange={(e) => {
-                const newOptions = e.target.value === 'true_false'
-                  ? [{ text: 'Verdadero', weight: 0 }, { text: 'Falso', weight: 0 }]
-                  : (mq.options || []);
-                setManualQuestion({ ...mq, type: e.target.value, options: newOptions });
-              }}
-              className="manual-type-select"
-            >
-              <option value="text">Texto libre</option>
-              <option value="single_choice">Opción única</option>
-              <option value="multiple_choice">Múltiple respuesta</option>
-              <option value="true_false">Verdadero / Falso</option>
-            </select>
+            <div className="manual-field">
+              <label>Nombre de la pregunta</label>
+              <input
+                type="text"
+                placeholder="Ej: Situación laboral"
+                value={mq.name}
+                onChange={(e) => setManualQuestion({ ...mq, name: e.target.value })}
+                className="manual-question-name-input"
+              />
+            </div>
+            <div className="manual-field">
+              <label>Pregunta</label>
+              <input
+                type="text"
+                placeholder="Escribe la pregunta tal como la verá el estudiante..."
+                value={mq.question}
+                onChange={(e) => setManualQuestion({ ...mq, question: e.target.value })}
+                className="manual-question-input"
+              />
+            </div>
+            <div className="manual-field">
+              <label>Tipo de respuesta</label>
+              <select
+                value={mq.type}
+                onChange={(e) => {
+                  const newOptions = e.target.value === 'true_false'
+                    ? [{ text: 'Verdadero', weight: 0 }, { text: 'Falso', weight: 0 }]
+                    : (mq.options || []);
+                  setManualQuestion({ ...mq, type: /** @type {QuestionType} */ (e.target.value), options: newOptions });
+                }}
+                className="manual-type-select"
+              >
+                <option value="text">Texto libre</option>
+                <option value="single_choice">Opción única</option>
+                <option value="multiple_choice">Múltiple respuesta</option>
+                <option value="true_false">Verdadero / Falso</option>
+              </select>
+            </div>
 
             {(mq.type !== 'text') && (
               <div className="manual-options-editor">
@@ -724,9 +1365,9 @@ const FormCreator = ({ onBack }) => {
               </div>
             )}
 
-            <div style={{ marginTop: 12 }}>
+            <div className="manual-question-controls">
               <button className="save-question-btn" onClick={saveManualQuestion}>Guardar pregunta</button>
-              <button className="back-to-select-btn" onClick={cancelCreateQuestion} style={{ marginLeft: 8 }}>Volver a seleccionar preguntas</button>
+              <button className="back-to-select-btn" onClick={cancelCreateQuestion}>Volver a seleccionar preguntas</button>
             </div>
           </div>
         </div>
@@ -735,44 +1376,15 @@ const FormCreator = ({ onBack }) => {
   };
 
   return (
-    <div>
+    <div className="formcreator-scope">
       <div className="formcreator-header-section">
         <h1 className="formcreator-title">Crear formulario</h1>
+        <span className="formcreator-subtitle">Caracterización de estudiantes</span>
       </div>
 
       <div className="formcreator-container">
         <div className="formcreator-body">
           <div className="formcreator-questions">
-            {mode === 'select' && (
-              <div className="student-select-box">
-                <label>Estudiante</label>
-                <div className="student-row">
-                  <div className="student-suggestions-wrapper" ref={suggestionsRef}>
-                    <input
-                      type="text"
-                      className="student-search-input"
-                      placeholder="Buscar estudiante por nombre..."
-                      value={getSearchInputValue()}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setShowSuggestions(true);
-                        setSelectedStudent(null);
-                      }}
-                      onFocus={() => setShowSuggestions(true)}
-                    />
-                    {showSuggestions && renderStudentSuggestions()}
-                  </div>
-
-                  <input
-                    type="email"
-                    readOnly
-                    value={getSelectedStudentEmail()}
-                    placeholder="Email del estudiante"
-                    className="student-email-input"
-                  />
-                </div>
-              </div>
-            )}
 
             <div className="mode-switch">
               <button 
@@ -811,7 +1423,6 @@ const FormCreator = ({ onBack }) => {
                   onClick={handleGenerateUrl} 
                   className="send-btn"
                   disabled={isGenerating}
-                  style={{ backgroundColor: '#222D56', color: 'white', fontSize: '20px' }}
                 >
                   {isGenerating ? 'Generando...' : 'Generar URL del formulario'}
                 </Button>

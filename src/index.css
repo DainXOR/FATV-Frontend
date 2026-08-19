@@ -4,9 +4,9 @@
 
 /* Variables de fuentes */
 :root {
-  --font-main: 'Impact', 'Arial Black', sans-serif;
-  --font-secondary: 'Oswald', sans-serif;
-  --font-body: 'Merriweather', Georgia, serif;
+  --font-main: 'Impact', 'Renogare', sans-serif;
+  --font-secondary: 'Myriad Pro', sans-serif;
+  --font-body: 'Myriad Pro', sans-serif;
 }
 
 /* Estilos base */
@@ -66,41 +66,62 @@ html {
   display: flex;
   position: relative;
   margin: 0 auto;
+  width: 100%;
   background-color: white !important;
 }
 
 .sidebar {
   width: 300px;
-  min-height: 100vh;
+  height: 100vh;
   background-color: #222D56 !important;
   padding: 20px;
-  transition: all 0.3s ease-in-out;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 90px;
-  position: sticky;
+  gap: 20px;
+  position: fixed;
   top: 0;
+  left: 0;
   z-index: 1000;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge (Chromium) */
+}
+
+.sidebar.collapsed {
+  gap: 40px;
+  width: 150px; /* matches your logo: 150px + padding */
 }
 
 .logo {
-  width: 160px;
-  height: 160px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
+  transition: width 0.35s ease, height 0.35s ease;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .logo {
+  width: 150px;
+  height: 150px;
 }
 
 .form-grid {
-  flex: 1; 
-  margin-left: 0;
-  transition: all 0.3s ease-in-out;
-  display: flex;
-  flex-direction: column;
-  max-width: calc(100% - 12px); 
-  width: 100%; 
-  margin: 12px; 
-  box-sizing: border-box; 
-  
+  margin-left: 200px;
+  width: calc(100% - 200px);
+  transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.container-form:not(.sidebar-collapsed) .form-grid {
+  margin-left: 300px;
+  width: calc(100% - 300px);
 }
 
 .form-grid h2 {
