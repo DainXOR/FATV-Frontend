@@ -12,6 +12,7 @@ import {
  * @typedef {import("../Models/StudentModels.js").StudentResult} StudentResult
  * @typedef {import("../Models/FormModels.js").FormQuestionResult} FormQuestionResult
  * @typedef {import("../Models/FormModels.js").FormRequest} FormRequest
+ * @typedef {import("../Models/FormModels.js").FormResult} FormResult
  * @typedef {import("../Models/FormModels.js").FormQuestionRequest} FormQuestionRequest
  * @typedef {import("../Models/FormModels.js").FormQuestionOption} FormQuestionOption
  * @typedef {import("../Models/FormModels.js").QuestionInfo} QuestionInfo
@@ -122,10 +123,10 @@ const getReadableQuestionType = (/** @type {String} */ backendId) => {
 };
 
 const sectionOptions = [
-  { value: 'academic', label: 'Académico' },
-  { value: 'socioeconomic', label: 'Socioeconómico' },
-  { value: 'relacional', label: 'Relacional' },
-  { value: 'socioemotional', label: 'Socioemocional' }
+  { value: /** @type {SectionType} */ ('academic'), label: 'Académico' },
+  { value: /** @type {SectionType} */ ('socioeconomic'), label: 'Socioeconómico' },
+  { value: /** @type {SectionType} */ ('relacional'), label: 'Relacional' },
+  { value: /** @type {SectionType} */ ('socioemotional'), label: 'Socioemocional' }
 ];
 
 const defaultSectionOrder = /** @type {SectionType[]} */ ([
@@ -157,18 +158,27 @@ const FormCreator = ({ onBack }) => {
   const [sectionOrder, setSectionOrder] = useState(/** @type {SectionType[]} */ (defaultSectionOrder));
   const questionNodeRefs = useRef(/** @type {Map<string, HTMLDivElement>} */ (new Map()));
   const sectionNodeRefs = useRef(/** @type {Map<SectionType, HTMLDivElement>} */ (new Map()));
-  const pendingFlip = useRef(/** @type {'question'|'section'|null} */ (null));
+  const pendingFlip = useRef(/** @type {'question'|'section'|''} */ (''));
   const oldPositions = useRef({
     questions: /** @type {Map<string, DOMRect>} */ (new Map()),
     sections: /** @type {Map<SectionType, DOMRect>} */ (new Map())
   });
   const [questionFilterText, setQuestionFilterText] = useState('');
   const [questionFilterType, setQuestionFilterType] = useState('all');
-  const [mode, setMode] = useState(/** @type {'select' | 'create-custom'} */('select')); 
-  const [formError, setFormError] = useState(/** @type {string | null} */(null));
-  const [formSuccess, setFormSuccess] = useState(/** @type {string | null} */(null));
-  const [generatedUrl, setGeneratedUrl] = useState(/** @type {string | null} */(null));
-  const [isGenerating, setIsGenerating] = useState(/** @type {boolean} */(false));
+  const [formFilterText, setFormFilterText] = useState('');
+  const [formError, setFormError] = useState(/** @type {string} */(''));
+  const [formSuccess, setFormSuccess] = useState(/** @type {string} */(''));
+  const [currentView, setCurrentView] = useState(/** @type {'questions' | 'forms'} */('forms'));
+  const [questionSubView, setQuestionSubView] = useState(/** @type {'list' | 'editor'} */('list'));
+  const [formSubView, setFormSubView] = useState(/** @type {'list' | 'editor'} */('list'));
+  const [forms, setForms] = useState(/** @type {FormResult[]} */([]));
+  const [selectedFormId, setSelectedFormId] = useState(/** @type {string} */(''));
+  const [isSavingForm, setIsSavingForm] = useState(/** @type {boolean} */(false));
+  // Fraction (0-1) of the form-editor width given to the question picker column.
+  // Defaults to giving the form/builder side more room, per user preference.
+  const [editorSplitRatio, setEditorSplitRatio] = useState(/** @type {number} */(0.38));
+  const editorColumnsRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const isDraggingSplit = useRef(false);
 
   // Single manual question editor (used only in create-custom mode)
   const [manualQuestion, setManualQuestion] = useState(/** @type {ReadableQuestion} */ ({
@@ -186,13 +196,18 @@ const FormCreator = ({ onBack }) => {
   ));
 
   const startCreateQuestion = () => {
+    resetQuestion();
+    setCurrentView('questions');
+    setQuestionSubView('editor');
+  };
+
+  const resetQuestion = () => {
     setManualQuestion({ id: `m${Date.now()}`, name: '', question: '', type: 'text', options: [] });
-    setMode('create-custom');
   };
 
   const cancelCreateQuestion = () => {
-    setManualQuestion({ id: `m${Date.now()}`, name: '', question: '', type: 'text', options: [] });
-    setMode('select');
+    resetQuestion();
+    setQuestionSubView('list');
   };
 
   const saveManualQuestion = async () => {
@@ -224,7 +239,7 @@ const FormCreator = ({ onBack }) => {
 
       setQuestions(prev => isEditing ? prev.map(q => q.id === manualQuestion.id ? saved : q) : [...prev, saved]);
       Swal.fire('Guardado', 'Pregunta guardada correctamente', 'success');
-      setMode('select');
+      setQuestionSubView('list');
     } catch (err) {
       const caught = /** @type {any} */ (err);
       console.error(caught);
@@ -240,7 +255,8 @@ const FormCreator = ({ onBack }) => {
       type: mapBackendToType(q.id_question_type),
       options: q.options || []
     });
-    setMode('create-custom');
+    setCurrentView('questions');
+    setQuestionSubView('editor');
   };
 
   const deleteQuestion = async (/** @type {FormQuestionResult} */ q) => {
@@ -321,6 +337,12 @@ const FormCreator = ({ onBack }) => {
     });
   };
 
+  const getFilteredForms = () => {
+    const term = (formFilterText || '').trim();
+    if (!term) return forms;
+    return forms.filter(f => fuzzyMatch(`${f.name || ''} ${f.description || ''}`, term));
+  };
+
   const getDefaultQuestionConfig = (/** @type {string} */ questionId) => ({
     section: 'academic',
     optional: false,
@@ -360,7 +382,7 @@ const FormCreator = ({ onBack }) => {
   const getSelectedQuestionObjects = () => {
     return /** @type {FormQuestionResult[]} */ (selectedQuestionIDs
       .map(id => questions.find(q => q.id === id))
-      .filter((q) => q != null));
+      .filter(q => q !== undefined));
   };
 
   const normalizeNeededAnswers = (/** @type {string} */ raw) => {
@@ -436,12 +458,12 @@ const FormCreator = ({ onBack }) => {
   useLayoutEffect(() => {
     if (pendingFlip.current === 'question') {
       animateFlip('question');
-      pendingFlip.current = null;
+      pendingFlip.current = '';
       oldPositions.current.questions.clear();
     }
     if (pendingFlip.current === 'section') {
       animateFlip('section');
-      pendingFlip.current = null;
+      pendingFlip.current = '';
       oldPositions.current.sections.clear();
     }
   }, [selectedQuestionIDs, sectionOrder, positionsAreGlobal, selectedQuestionConfigs]);
@@ -564,7 +586,7 @@ const FormCreator = ({ onBack }) => {
   const getQuestionsInSection = (sectionType) => {
     return selectedQuestionIDs
       .map(id => questions.find(q => q.id === id))
-      .filter(q => q != null)
+      .filter(q => q !== undefined)
       .filter(q => {
         const config = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
         return config.section === sectionType;
@@ -730,95 +752,6 @@ const FormCreator = ({ onBack }) => {
     };
   };
 
-  const submitForm = async (/** @type {FormRequest} */ formPayload) => {
-    const response = await FormApi.create(formPayload);
-    if (!response.ok) {
-      const error = /** @type {Error & { code?: string | number; details?: any }} */ (new Error(response.error?.message || 'Error al crear formulario'));
-      error.code = response.status;
-      error.details = response.error;
-      throw error;
-    }
-
-    const newFormId = response.body.data.id;
-    if (!newFormId) {
-      const error = /** @type {Error & { code?: string }} */ (new Error('El backend no devolvió un ID de formulario.'));
-      error.code = 'MISSING_ID';
-      throw error;
-    }
-
-    return newFormId;
-  };
-
-  const handleGenerateUrl = async () => {
-    setFormError(null);
-    setFormSuccess(null);
-    setGeneratedUrl(null);
-    setIsGenerating(true);
-
-    try {
-      const questionsPayload = prepareInputs();
-      const formPayload = buildFormPayload(questionsPayload);
-      const newFormId = await submitForm(formPayload);
-
-      const studentFormUrl = `${window.location.origin}/student-form/${newFormId}`;
-      setGeneratedUrl(studentFormUrl);
-      setFormSuccess('URL generada correctamente. Comparte este enlace con el estudiante.');
-
-      Swal.fire({
-        title: '¡Formulario creado!',
-        text: 'El formulario ha sido generado exitosamente',
-        icon: 'success',
-        confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#673ab7',
-      });
-    } catch (error) {
-      const caught = /** @type {any} */ (error);
-      const statusCode = caught.status || caught.code || 'UNKNOWN';
-      const message = caught.message || 'Error al generar el formulario';
-      const details = caught.details || caught;
-
-      console.error('Error al generar URL:', { statusCode, message, details });
-      setFormError(message);
-
-      Swal.fire({
-        title: 'Error',
-        text: `${message} (${statusCode})`,
-        icon: 'error',
-        confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#d33',
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  /**
-   * Copies the generated URL to the clipboard.
-   */
-  const copyUrlToClipboard = () => {
-    if (generatedUrl) {
-      navigator.clipboard.writeText(generatedUrl).then(() => {
-        Swal.fire({
-          title: '¡Copiado!',
-          text: 'El URL ha sido copiado al portapapeles',
-          icon: 'success',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#673ab7',
-          timer: 2000
-        });
-      }).catch(err => {
-        console.error('Error al copiar:', err);
-        Swal.fire({
-          title: 'Error',
-          text: 'No se pudo copiar el URL',
-          icon: 'error',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#d33'
-        });
-      });
-    }
-  };
-
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
@@ -828,36 +761,36 @@ const FormCreator = ({ onBack }) => {
           throw new Error(response.error?.message || 'Error al cargar preguntas');
         }
 
-        const questions = response.body.data;
-        if (!Array.isArray(questions)) {
+        const data = response.body.data;
+        if (!Array.isArray(data)) {
           console.error("El backend NO devolvió una lista en 'data'");
           return;
         }
-        setQuestions(questions);
-      } catch (err) {
-        console.error("Error cargando preguntas:", err);
+        setQuestions(data);
+      } catch (error) {
+        const caught = /** @type {Error & { message?: string }} */ (error);
+        console.error('Error cargando preguntas:', caught);
         Swal.fire({
-          title: "Error",
-          text: "No se pudieron cargar las preguntas.",
-          icon: "error",
-          confirmButtonText: "Aceptar"
+          title: 'Error',
+          text: 'No se pudieron cargar las preguntas.',
+          icon: 'error',
+          confirmButtonText: 'Aceptar',
         });
       }
     };
-    fetchQuestions();
-  }, []);
 
+    const fetchForms = async () => {
+      await refreshForms();
+    };
+
+    fetchQuestions();
+    fetchForms();
+  }, []);
 
   /**
    * Gets the correct CSS class for mode button.
    * Extracted from: className={"mode-btn " + (mode === 'select' ? 'active' : '')}
    */
-  const getModeButtonClass = (/** @type {string} */ buttonMode) => {
-    const baseClass = 'mode-btn';
-    const isActive = mode === buttonMode;
-    return isActive ? `${baseClass} active` : baseClass;
-  };
-
   const getSectionLabel = (/** @type {SectionType} */ key) => {
     const section = sectionOptions.find(item => item.value === key);
     return section ? section.label : key;
@@ -867,12 +800,13 @@ const FormCreator = ({ onBack }) => {
     const config = selectedQuestionConfigs[q.id] || getDefaultQuestionConfig(q.id);
     const parentCandidates = visibleList.filter(item => item.id !== q.id);
     const parentQuestion = questions.find(item => item.id === config.parentQuestionId);
-    const parentQuestionType = parentQuestion ? mapBackendToType(parentQuestion.id_question_type) : null;
-    const parentQuestionOptions = parentQuestion && hasOptions(parentQuestion)
+    const hasParent = parentQuestion !== undefined;
+    const parentQuestionType = hasParent ? mapBackendToType(parentQuestion.id_question_type) : 'text';
+    const parentQuestionOptions = hasParent && hasOptions(parentQuestion)
       ? parentQuestion.options.map(opt => opt.text)
       : [];
-    const parentIsOpen = parentQuestionType ? isOpenAnswerType(parentQuestionType) : false;
-    const parentIsSingle = parentQuestionType ? isSingleAnswerType(parentQuestionType) : false;
+    const parentIsOpen = isOpenAnswerType(parentQuestionType);
+    const parentIsSingle = isSingleAnswerType(parentQuestionType);
 
     return (
       <div
@@ -1140,7 +1074,7 @@ const FormCreator = ({ onBack }) => {
           ) : (
             sectionOrder.map((sectionType, sectionIndex) => {
               const sectionQuestions = questionsBySection[sectionType];
-              if (!sectionQuestions || !sectionQuestions.length) return null;
+              if (sectionQuestions.length === 0) return null;
               return (
                 <div
                   key={sectionType}
@@ -1187,108 +1121,27 @@ const FormCreator = ({ onBack }) => {
    * Renders the main form content based on current mode.
    * Extracted to replace large ternary: {mode === 'select' ? ( <> ... select JSX ... </> ) : ( <> ... create JSX ... </> )}
    */
-  const renderFormModeContent = () => {
-    if (mode === 'select') {
-      return renderSelectModeContent();
-    } else {
-      return renderCreateModeContent();
-    }
-  };
-
   /**
    * Renders the "select predefined questions" mode content.
    */
-  const renderSelectModeContent = () => {
-    return (
-      <>
-        <h3>Selecciona la pregunta a enviar</h3>
-        <div className="question-filter-row">
-          <input
-            type="text"
-            placeholder="Busca por nombre"
-            value={questionFilterText}
-            onChange={(e) => setQuestionFilterText(e.target.value)}
-            className="question-filter-input"
-          />
-          <select
-            value={questionFilterType}
-            onChange={(e) => setQuestionFilterType(e.target.value)}
-            className="question-filter-type-select"
-          >
-            <option value="all">Todos los tipos</option>
-            <option value="text">Texto libre</option>
-            <option value="single_choice">Opción única</option>
-            <option value="multiple_choice">Múltiple respuesta</option>
-            <option value="true_false">Verdadero / Falso</option>
-          </select>
-        </div>
-        <table className="questions-table">
-          <tbody>
-            {getFilteredQuestions().map(q => (
-              <tr key={q.id} className="question-row">
-                <td className="q-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedQuestionIDs.includes(q.id)}
-                    onChange={() => toggleQuestion(q.id)}
-                  />
-                </td>
-                <td className="q-text">
-                  <div className="q-name-row">
-                    <span className="q-name">{q.name}</span>
-                    <span className="q-type-badge">{getReadableQuestionType(q.id_question_type)}</span>
-                  </div>
-                  <div className="q-meta-row">
-                    <span className="q-question-preview">{q.question}</span>
-                    {hasOptions(q) && q.options.map((opt, idx) => (
-                      <span key={idx} className="q-option-chip">
-                        <span className="q-option-text">{opt.text}</span>
-                        <span className="q-option-weight">
-                          <span className="q-weight-label">peso</span> {opt.weight}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="q-actions-cell">
-                  <div className="q-actions">
-                    <button className="q-edit-btn" onClick={() => startEditQuestion(q)} title="Editar">
-                      ✎
-                    </button>
-                    <button className="q-delete-btn" onClick={() => deleteQuestion(q)} title="Eliminar">
-                      🗑
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {renderSelectedQuestionBuilder()}
-      </>
-    );
-  };
-
   /**
    * Renders the "create questions manually" mode content.
    */
   const renderCreateModeContent = () => {
     const mq = manualQuestion;
     return (
-      <>
-        <h3>Crear pregunta</h3>
-        <div className="manual-questions single">
-          <div className="manual-question-row">
-            <div className="manual-field">
-              <label>Nombre de la pregunta</label>
-              <input
-                type="text"
-                placeholder="Ej: Situación laboral"
-                value={mq.name}
-                onChange={(e) => setManualQuestion({ ...mq, name: e.target.value })}
-                className="manual-question-name-input"
-              />
-            </div>
+      <div className="manual-questions single">
+        <div className="manual-question-row">
+          <div className="manual-field">
+            <label>Nombre de la pregunta</label>
+            <input
+              type="text"
+              placeholder="Ej: Situación laboral"
+              value={mq.name}
+              onChange={(e) => setManualQuestion({ ...mq, name: e.target.value })}
+              className="manual-question-name-input"
+            />
+          </div>
             <div className="manual-field">
               <label>Pregunta</label>
               <input
@@ -1371,9 +1224,433 @@ const FormCreator = ({ onBack }) => {
             </div>
           </div>
         </div>
-      </>
     );
   };
+
+  const getFormUrl = (/** @type {string} */ formId) => `${window.location.origin}/student-form/${formId}`;
+
+  const handleSplitDragStart = (/** @type {React.MouseEvent} */ e) => {
+    e.preventDefault();
+    isDraggingSplit.current = true;
+
+    const handleMouseMove = (/** @type {MouseEvent} */ moveEvent) => {
+      if (!isDraggingSplit.current || !editorColumnsRef.current) return;
+      const rect = editorColumnsRef.current.getBoundingClientRect();
+      const ratio = (moveEvent.clientX - rect.left) / rect.width;
+      const clamped = Math.min(0.7, Math.max(0.2, ratio));
+      setEditorSplitRatio(clamped);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSplit.current = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const resetFormBuilder = () => {
+    setSelectedQuestionIDs([]);
+    setSelectedQuestionConfigs({});
+    setPositionsAreGlobal(true);
+    setSectionOrder(defaultSectionOrder);
+    setSectionWeights({ ...defaultSectionWeights });
+    setFormName('');
+    setFormDescription('');
+    setSelectedFormId('');
+    setFormError('');
+    setFormSuccess('');
+  };
+
+  /**
+   * Hydrates the form builder using a stored form payload.
+   *
+   * @param {FormResult} form
+   * @returns {void}
+   */
+  const hydrateFormBuilderFromResult = (form) => {
+    const sectionByQuestionId = /** @type {{[questionId: string]: SectionType}} */ ({});
+    const positionByQuestionId = /** @type {{[questionId: string]: number}} */ ({});
+    const nextSectionOrder = /** @type {SectionType[]} */ ([]);
+    const nextSectionWeights = /** @type {{[K in SectionType]: number}} */ ({
+      academic: 25,
+      socioeconomic: 25,
+      relacional: 25,
+      socioemotional: 25,
+    });
+
+    // Sections are keyed by position (1..4), but which SectionType each
+    // position represents depends on the order the user had chosen when the
+    // form was saved (via moveSection) — it's recorded in sections_info's
+    // label, not implied by the fixed academic/socioeconomic/... order.
+    const getLabelSectionType = (/** @type {string} */ label) => {
+      const match = sectionOptions.find(opt => opt.label === label);
+      return match ? match.value : undefined;
+    };
+
+    const sectionTypeByPosition = /** @type {{[position: number]: SectionType}} */ ({});
+    Object.entries(form.sections_info || {}).forEach(([sectionPosition, sectionInfo]) => {
+      const sectionType = getLabelSectionType(sectionInfo?.name)
+        || defaultSectionOrder[Number(sectionPosition) - 1]
+        || 'academic';
+      sectionTypeByPosition[Number(sectionPosition)] = sectionType;
+    });
+
+    Object.entries(form.sections || {})
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .forEach(([sectionPosition, items]) => {
+        const sectionType = sectionTypeByPosition[Number(sectionPosition)]
+          || defaultSectionOrder[Number(sectionPosition) - 1]
+          || 'academic';
+        if (!nextSectionOrder.includes(sectionType)) {
+          nextSectionOrder.push(sectionType);
+        }
+        /** @type {QuestionInfo[]} */ (items || []).forEach((item) => {
+          if (!item || !item.id_question) {
+            return;
+          }
+          sectionByQuestionId[item.id_question] = sectionType;
+          positionByQuestionId[item.id_question] = Number(item.position) || 0;
+        });
+      });
+
+    // Any section not present in the saved data still needs a slot so the
+    // toggle/grouping UI has somewhere to put it.
+    defaultSectionOrder.forEach((sectionType) => {
+      if (!nextSectionOrder.includes(sectionType)) {
+        nextSectionOrder.push(sectionType);
+      }
+    });
+
+    const nextQuestionConfigs = /** @type {QuestionConfigMap} */ ({ });
+
+    /** @type {QuestionInfo[]} */ (form.questions_info || []).forEach((item) => {
+      if (!item || !item.id_question) {
+        return;
+      }
+
+      const sectionType = sectionByQuestionId[item.id_question] || 'academic';
+      const parentQuestionId = item.parent?.id_question || '';
+      const neededAnswers = Array.isArray(item.parent?.needed_answers) ? item.parent.needed_answers : [];
+      nextQuestionConfigs[item.id_question] = {
+        section: sectionType,
+        optional: Boolean(item.optional),
+        parentQuestionId,
+        neededAnswers,
+        weight: Number.isFinite(item.weight) ? item.weight : INITIAL_QUESTION_WEIGHT,
+      };
+      if (!(item.id_question in positionByQuestionId)) {
+        positionByQuestionId[item.id_question] = Number(item.position) || 0;
+      }
+    });
+
+    // Order questions by their saved position. In global mode, position is
+    // the absolute order across the whole form. In grouped mode, position is
+    // relative to each section, so group by section first, then by position.
+    const isGlobal = Boolean(form.positions_are_global);
+    const questionOrder = Object.keys(nextQuestionConfigs).sort((a, b) => {
+      if (isGlobal) {
+        return (positionByQuestionId[a] || 0) - (positionByQuestionId[b] || 0);
+      }
+      const sectionA = nextSectionOrder.indexOf(nextQuestionConfigs[a].section);
+      const sectionB = nextSectionOrder.indexOf(nextQuestionConfigs[b].section);
+      if (sectionA !== sectionB) return sectionA - sectionB;
+      return (positionByQuestionId[a] || 0) - (positionByQuestionId[b] || 0);
+    });
+
+    Object.entries(form.sections_info || {}).forEach(([sectionPosition, sectionInfo]) => {
+      const sectionType = sectionTypeByPosition[Number(sectionPosition)]
+        || defaultSectionOrder[Number(sectionPosition) - 1]
+        || 'academic';
+      const nextWeight = Number(sectionInfo?.weight) || 0;
+      nextSectionWeights[sectionType] = Math.max(0, nextWeight);
+    });
+
+    setSelectedQuestionIDs(questionOrder);
+    setSelectedQuestionConfigs(nextQuestionConfigs);
+    setPositionsAreGlobal(isGlobal);
+    setSectionOrder(nextSectionOrder);
+    setFormName(form.name || '');
+    setFormDescription(form.description || '');
+    setSelectedFormId(form.id || '');
+    setSectionWeights(nextSectionWeights);
+  };
+
+  const refreshForms = async () => {
+    try {
+      const response = await FormApi.getAll();
+
+      if (!response.ok) {
+        throw new Error(response.error.message || 'Error al cargar formularios');
+      }
+
+      setForms(response.body.data);
+    } catch (error) {
+      const caught = /** @type {Error & { message?: string }} */ (error);
+      console.error('Error cargando formularios:', caught);
+      setForms([]);
+    }
+  };
+
+  /**
+   * Saves the current form as a create or update flow.
+   *
+   * @returns {Promise<void>}
+   */
+  const saveForm = async () => {
+    setFormError('');
+    setFormSuccess('');
+    setIsSavingForm(true);
+
+    try {
+      const questionsPayload = prepareInputs();
+      const formPayload = buildFormPayload(questionsPayload);
+      const response = selectedFormId
+        ? await FormApi.patchById(selectedFormId, formPayload)
+        : await FormApi.create(formPayload);
+
+      if (!response.ok) {
+        throw new Error(response.error?.message || 'Error al guardar formulario');
+      }
+
+      const nextFormId = /** @type {string} */ (selectedFormId || response.body.data?.id || '');
+      if (!nextFormId) {
+        throw new Error('El backend no devolvió un ID de formulario.');
+      }
+
+      setSelectedFormId(nextFormId);
+      setFormSuccess(selectedFormId ? 'Formulario actualizado correctamente.' : 'Formulario creado correctamente.');
+      await refreshForms();
+      const persistedForm = forms.find((form) => form.id === nextFormId);
+      if (persistedForm && Array.isArray(persistedForm.questions_info) && persistedForm.sections) {
+        hydrateFormBuilderFromResult(persistedForm);
+      }
+
+      Swal.fire({
+        title: selectedFormId ? 'Formulario actualizado' : 'Formulario creado',
+        text: selectedFormId ? 'Los cambios se guardaron correctamente.' : 'El formulario ha sido creado exitosamente.',
+        icon: 'success',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#673ab7',
+      });
+    } catch (error) {
+      const caught = /** @type {Error & { status?: number, code?: string | number, details?: unknown, message?: string }} */ (error);
+      const statusCode = caught.status || caught.code || 'UNKNOWN';
+      const message = caught.message || 'Error al guardar el formulario';
+      console.error('Error guardando formulario:', { statusCode, message, details: caught.details || caught });
+      setFormError(message);
+
+      Swal.fire({
+        title: 'Error',
+        text: `${message} (${statusCode})`,
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#d33',
+      });
+    } finally {
+      setIsSavingForm(false);
+    }
+  };
+
+  /**
+   * Loads an existing form into the editor.
+   *
+   * @param {FormResult} form
+   * @returns {Promise<void>}
+   */
+  const openFormForEditing = async (form) => {
+    const response = await FormApi.getById(form.id);
+
+    if (!response.ok) {
+      const message = response.error?.message || 'No se pudo cargar el formulario';
+      Swal.fire({
+        title: 'Error',
+        text: message,
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+      });
+      return;
+    }
+
+    const detailedForm = response.body.data;
+    hydrateFormBuilderFromResult(detailedForm);
+    setCurrentView('forms');
+    setFormSubView('editor');
+  };
+
+  /**
+   * Copies text to the clipboard and shows a confirmation popup.
+   *
+   * @param {string} value
+   * @param {string} successText
+   * @returns {Promise<void>}
+   */
+  const copyTextToClipboard = async (value, successText) => {
+    if (!value) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      Swal.fire({
+        title: '¡Copiado!',
+        text: successText,
+        icon: 'success',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#673ab7',
+        timer: 2000,
+      });
+    } catch (error) {
+      const caught = /** @type {Error & { message?: string }} */ (error);
+      console.error('Error al copiar:', caught);
+      Swal.fire({
+        title: 'Error',
+        text: 'No se pudo copiar el contenido al portapapeles',
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#d33',
+      });
+    }
+  };
+
+  const deleteForm = async (/** @type {FormResult} */ form) => {
+    const confirmed = await Swal.fire({
+      title: '¿Eliminar formulario?',
+      text: `Se eliminará el formulario "${form.name || 'Sin nombre'}".`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+
+    if (!confirmed.isConfirmed) {
+      return;
+    }
+
+    try {
+      const response = await FormApi.deleteById(form.id);
+      if (!response.ok) {
+        throw new Error(response.error?.message || 'No se pudo eliminar el formulario');
+      }
+
+      setForms((previous) => previous.filter((item) => item.id !== form.id));
+      if (selectedFormId === form.id) {
+        resetFormBuilder();
+      }
+      Swal.fire({
+        title: 'Formulario eliminado',
+        text: 'El formulario se eliminó correctamente.',
+        icon: 'success',
+        confirmButtonText: 'Aceptar',
+      });
+    } catch (error) {
+      const caught = /** @type {Error & { message?: string }} */ (error);
+      console.error('Error eliminando formulario:', caught);
+      Swal.fire({
+        title: 'Error',
+        text: caught.message || 'No se pudo eliminar el formulario',
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+      });
+    }
+  };
+
+  /**
+   * Starts a new form creation flow.
+   * Resets the form builder and navigates to the forms tab's editor.
+   * @returns {void}
+   */
+  const createNewForm = () => {
+    resetFormBuilder();
+    setCurrentView('forms');
+    setFormSubView('editor');
+  };
+
+/**
+ * Renders the questions table.
+ * @param {'manage' | 'select'} mode - 'manage': browse/edit/delete questions (questions tab).
+ *   'select': pick questions for a form via checkboxes (form editor).
+ */
+const renderQuestionListContent = (mode = 'manage') => {
+  const isSelect = mode === 'select';
+  return (
+    <>
+      <div className="question-filter-row">
+        <input
+          type="text"
+          placeholder="Busca por nombre"
+          value={questionFilterText}
+          onChange={(e) => setQuestionFilterText(e.target.value)}
+          className="question-filter-input"
+        />
+        <select
+          value={questionFilterType}
+          onChange={(e) => setQuestionFilterType(e.target.value)}
+          className="question-filter-type-select"
+        >
+          <option value="all">Todos los tipos</option>
+          <option value="text">Texto libre</option>
+          <option value="single_choice">Opción única</option>
+          <option value="multiple_choice">Múltiple respuesta</option>
+          <option value="true_false">Verdadero / Falso</option>
+        </select>
+      </div>
+      <table className="questions-table">
+        <tbody>
+          {getFilteredQuestions().map(q => (
+            <tr key={q.id} className="question-row">
+              {isSelect && (
+                <td className="q-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={selectedQuestionIDs.includes(q.id)}
+                    onChange={() => toggleQuestion(q.id)}
+                  />
+                </td>
+              )}
+              <td className="q-text">
+                <div className="q-name-row">
+                  <span className="q-name">{q.name}</span>
+                  <span className="q-type-badge">{getReadableQuestionType(q.id_question_type)}</span>
+                </div>
+                <div className="q-meta-row">
+                  <span className="q-question-preview">{q.question}</span>
+                </div>
+                {hasOptions(q) && (
+                  <div className="q-options-row">
+                    {q.options.map((opt, idx) => (
+                      <span key={idx} className="q-option-chip">
+                        <span className="q-option-text">{opt.text}</span>
+                        <span className="q-option-weight">
+                          <span className="q-weight-label">peso</span> {opt.weight}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </td>
+              {!isSelect && (
+                <td className="q-actions-cell">
+                  <div className="q-actions">
+                    <button className="q-edit-btn" onClick={() => startEditQuestion(q)} title="Editar">
+                      ✎
+                    </button>
+                    <button className="q-delete-btn" onClick={() => deleteQuestion(q)} title="Eliminar">
+                      🗑
+                    </button>
+                  </div>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+};
 
   return (
     <div className="formcreator-scope">
@@ -1385,50 +1662,209 @@ const FormCreator = ({ onBack }) => {
       <div className="formcreator-container">
         <div className="formcreator-body">
           <div className="formcreator-questions">
-
-            <div className="mode-switch">
-              <button 
-                className={getModeButtonClass('select')} 
-                onClick={() => setMode('select')}
+            <div className="formcreator-subsection-tabs" role="tablist" aria-label="Tipos de contenido del creador de formularios">
+              <button
+                type="button"
+                className={currentView === 'forms' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                onClick={() => setCurrentView('forms')}
               >
-                Seleccionar preguntas
+                Formularios
               </button>
-              <button 
-                className={getModeButtonClass('create-custom')} 
-                onClick={startCreateQuestion}
+              <button
+                type="button"
+                className={currentView === 'questions' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                onClick={() => setCurrentView('questions')}
               >
-                Crear preguntas
+                Preguntas
               </button>
             </div>
 
-            {renderFormModeContent()}
-          </div>
+            {currentView === 'questions' && (
+              <div className="management-shell">
+                <div className="management-subtabs" role="tablist" aria-label="Subsecciones de preguntas">
+                  <div className="management-subtabs-group">
+                    <button
+                      type="button"
+                      className={questionSubView === 'list' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                      onClick={() => setQuestionSubView('list')}
+                    >
+                      Listado
+                    </button>
+                    <button
+                      type="button"
+                      className={questionSubView === 'editor' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                      onClick={startCreateQuestion}
+                    >
+                      Crear / Editar
+                    </button>
+                  </div>
+                </div>
 
-          {mode === 'select' && (
-            <div className="formcreator-footer">
-              <div className="form-footer-row">
-                {formError && <div className="form-error">{formError}</div>}
-                {formSuccess && <div className="form-success">{formSuccess}</div>}
-                {generatedUrl && (
-                  <div className="generated-url-box">
-                    <label>URL del formulario para el estudiante:</label>
-                    <div className="url-display">
-                      <input type="text" readOnly value={generatedUrl} className="url-input" />
-                      <Button variant="outlined" onClick={copyUrlToClipboard}>Copiar URL</Button>
+                {questionSubView === 'list' ? (
+                  renderQuestionListContent('manage')
+                ) : (
+                  renderCreateModeContent()
+                )}
+              </div>
+            )}
+
+            {currentView === 'forms' && (
+              <div className="management-shell">
+                <div className="management-subtabs" role="tablist" aria-label="Subsecciones de formularios">
+                  <div className="management-subtabs-group">
+                    <button
+                      type="button"
+                      className={formSubView === 'list' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                      onClick={() => setFormSubView('list')}
+                    >
+                      Listado
+                    </button>
+                    <button
+                      type="button"
+                      className={formSubView === 'editor' ? 'fc-subsection-tab active' : 'fc-subsection-tab'}
+                      onClick={createNewForm}
+                    >
+                      Crear / Editar
+                    </button>
+                  </div>
+                </div>
+
+                {formSubView === 'list' ? (
+                  <div className="forms-manager">
+                    {forms.length > 0 && (
+                      <div className="question-filter-row">
+                        <input
+                          type="text"
+                          placeholder="Busca por nombre o descripción"
+                          value={formFilterText}
+                          onChange={(e) => setFormFilterText(e.target.value)}
+                          className="question-filter-input"
+                        />
+                      </div>
+                    )}
+
+                    {forms.length === 0 ? (
+                      <div className="empty-selection-hint">No hay formularios creados todavía.</div>
+                    ) : getFilteredForms().length === 0 ? (
+                      <div className="empty-selection-hint">Ningún formulario coincide con tu búsqueda.</div>
+                    ) : (
+                      <table className="questions-table">
+                        <tbody>
+                          {getFilteredForms().map((form) => (
+                            <tr key={form.id} className="question-row">
+                              <td className="q-text">
+                                <div className="q-name-row">
+                                  <span className="q-name">{form.name || 'Formulario sin nombre'}</span>
+                                  <span className="q-type-badge">{form.questions_info?.length || 0} preguntas</span>
+                                </div>
+                                <div className="q-meta-row">
+                                  <span className="q-question-preview">
+                                    {form.description || 'Sin descripción disponible.'}
+                                  </span>
+                                </div>
+                                <div className="q-options-row">
+                                  <span className="form-view-date">
+                                    {form.created_at ? new Date(form.created_at).toLocaleDateString('es-ES') : (form.date ? new Date(form.date).toLocaleDateString('es-ES') : 'Sin fecha')}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="q-actions-cell forms-actions-cell">
+                                <div className="q-actions">
+                                  <button className="q-edit-btn" onClick={() => openFormForEditing(form)} title="Ver / Editar">
+                                    ✎
+                                  </button>
+                                  <button
+                                    className="q-edit-btn"
+                                    onClick={() => copyTextToClipboard(getFormUrl(form.id), 'URL del formulario copiada al portapapeles.')}
+                                    title="Copiar URL"
+                                  >
+                                    🔗
+                                  </button>
+                                  <button className="q-delete-btn" onClick={() => deleteForm(form)} title="Eliminar">
+                                    🗑
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ) : (
+                  <div className="form-editor-shell">
+                    <div
+                      className="form-editor-columns"
+                      ref={editorColumnsRef}
+                      style={{ gridTemplateColumns: `minmax(240px, ${editorSplitRatio}fr) auto minmax(280px, ${1 - editorSplitRatio}fr)` }}
+                    >
+                      <div className="form-editor-col form-editor-col-picker">
+                        <h4 className="form-editor-subheading">Selecciona la pregunta a enviar</h4>
+                        {renderQuestionListContent('select')}
+                      </div>
+
+                      <div
+                        className="form-editor-splitter"
+                        onMouseDown={handleSplitDragStart}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="Redimensionar columnas"
+                        title="Arrastra para redimensionar"
+                      >
+                        <span className="form-editor-splitter-grip" />
+                      </div>
+
+                      <div className="form-editor-col form-editor-col-builder">
+                        {renderSelectedQuestionBuilder()}
+
+                        {selectedQuestionIDs.length > 0 && (
+                          <div className="form-editor-actions">
+                            <Button
+                              variant="contained"
+                              onClick={saveForm}
+                              disabled={isSavingForm}
+                              className="send-btn"
+                            >
+                              {isSavingForm ? 'Guardando...' : selectedFormId ? 'Guardar cambios' : 'Crear formulario'}
+                            </Button>
+                            {selectedFormId && (
+                              <Button
+                                variant="outlined"
+                                onClick={() => {
+                                  resetFormBuilder();
+                                  setFormSubView('editor');
+                                }}
+                              >
+                                Crear nuevo
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {formError && <div className="form-error">{formError}</div>}
+                        {formSuccess && <div className="form-success">{formSuccess}</div>}
+
+                        {selectedFormId && (
+                          <div className="generated-url-box">
+                            <label>URL del formulario para el estudiante:</label>
+                            <div className="url-display">
+                              <input type="text" readOnly value={getFormUrl(selectedFormId)} className="url-input" />
+                              <Button
+                                variant="outlined"
+                                onClick={() => copyTextToClipboard(getFormUrl(selectedFormId), 'URL del formulario copiada al portapapeles.')}
+                              >
+                                Copiar URL
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
-                <Button 
-                  variant="contained" 
-                  onClick={handleGenerateUrl} 
-                  className="send-btn"
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? 'Generando...' : 'Generar URL del formulario'}
-                </Button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

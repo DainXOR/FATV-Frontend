@@ -37,7 +37,7 @@
 
 /**
  * Question ID -> answer value
- * @typedef {{[QuestionID: string]: string}} Answers
+ * @typedef {{[QuestionID: string]: string[]}} Answers
  */
 
 /**

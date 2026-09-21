@@ -4,19 +4,41 @@ import '../Estilos/StudentForm.css';
 
 import FormsApi from '../api/FormsApi';
 
-const StudentForm = ({ formId }) => {
-  const [formConfig, setFormConfig] = useState(null);
-  const [studentInfo, setStudentInfo] = useState({
-    number_id: '',
-    first_name: '',
-    last_name: '',
-    email: ''
-  });
+/**
+ * @typedef {import("../Models/FormModels.js").FormResult} FormResult
+ * @typedef {import("../Models/FormModels.js").QuestionInfo} QuestionInfo
+ * @typedef {import("../Models/FormModels.js").FormQuestionResult} FormQuestionResult
+ * @typedef {import("../Models/FormModels.js").FormQuestionTypeResult} FormQuestionTypeResult
+ * @typedef {import("../Models/FormModels.js").FormAnswerRequest} FormAnswerRequest
+ * @typedef {import("../Models/FormModels.js").Answers} Answers
+ */
 
-  const [answers, setAnswers] = useState({});
+/** Known question type names, as stored in db. */
+const QUESTION_TYPE = {
+  TEXT: 'abierta',
+  MULTIPLE_CHOICE: 'opcion multiple',
+  SINGLE_CHOICE: 'opcion unica',
+  BOOLEAN: 'verdadero o falso',
+};
+
+/**
+ * A question merged with its resolved type name, ready to render.
+ * @typedef {Object} RenderableQuestion
+ * @property {string} id_question
+ * @property {number} position
+ * @property {boolean} optional
+ * @property {string} question
+ * @property {import("../Models/FormModels.js").FormQuestionOption[]} options
+ * @property {string} type_name
+ */
+
+const StudentForm = ({ formId }) => {
+  const [formConfig, setFormConfig] = useState(/** @type {FormResult | null} */(null));
+  const [questions, setQuestions] = useState(/** @type {RenderableQuestion[]} */([]));
+
+  const [answers, setAnswers] = useState(/** @type {Answers} */({}));
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
 
   useEffect(() => {
     const loadForm = async () => {
@@ -25,14 +47,52 @@ const StudentForm = ({ formId }) => {
         if (!resForm.ok) {
           throw new Error(resForm.error.message || 'Error al cargar el formulario');
         }
+        const form = resForm.body.data;
 
-        const formData = resForm.body.data;
-        const resBank = await FormsApi.getAll();
-        if (!resBank.ok) {
-          throw new Error(resBank.error.message || 'Error al cargar el banco de preguntas');
+        const resTypes = await FormsApi.Questions().Types().getAll();
+        if (!resTypes.ok) {
+          throw new Error(resTypes.error.message || 'Error al cargar los tipos de pregunta');
         }
+        /** @type {Map<string, FormQuestionTypeResult>} */
+        const typesById = new Map(resTypes.body.data.map(t => [t.id, t]));
 
-        const bankList = resBank.body.data;
+        /** @type {QuestionInfo[]} */
+        const questionInfos = Object.values(form.sections).flat();
+
+        const questionResults = await Promise.all(
+          questionInfos.map(qi => FormsApi.Questions().getById(qi.id_question))
+        );
+
+        /** @type {RenderableQuestion[]} */
+        const renderable = questionInfos.map((qi, i) => {
+          const res = questionResults[i];
+          if (!res.ok) {
+            throw new Error(res.error.message || 'Error al cargar una pregunta');
+          }
+          /** @type {FormQuestionResult} */
+          const q = res.body.data;
+          const type = typesById.get(q.id_question_type);
+
+          return {
+            id_question: qi.id_question,
+            position: qi.position,
+            optional: qi.optional,
+            question: q.question,
+            options: q.options,
+            type_name: type?.name ?? '',
+          };
+        });
+
+        renderable.sort((a, b) => a.position - b.position);
+
+        const initialAnswers = /** @type {Answers} */({});
+        renderable.forEach(q => {
+          initialAnswers[q.id_question] = [];
+        });
+
+        setFormConfig(form);
+        setQuestions(renderable);
+        setAnswers(initialAnswers);
       } catch (err) {
         Swal.fire("Error", "No se pudo cargar el formulario", "error");
       } finally {
@@ -42,9 +102,14 @@ const StudentForm = ({ formId }) => {
     loadForm();
   }, [formId]);
 
-  const handleAnswerChange = (questionId, value, type) => {
+  /**
+   * @param {string} questionId
+   * @param {string} value
+   * @param {string} typeName
+   */
+  const handleAnswerChange = (questionId, value, typeName) => {
     setAnswers(prev => {
-      if (type === 3) {
+      if (typeName === QUESTION_TYPE.MULTIPLE_CHOICE) {
         const exists = prev[questionId].includes(value);
         return {
           ...prev,
@@ -53,52 +118,40 @@ const StudentForm = ({ formId }) => {
             : [...prev[questionId], value]
         };
       }
-      return { ...prev, [questionId]: value };
+      return { ...prev, [questionId]: [value] };
     });
   };
 
   const validate = () => {
-    if (!studentInfo.number_id.trim())
-      return Swal.fire("Falta información", "Por favor ingresa tu cédula", "warning");
-
-    if (!studentInfo.first_name.trim())
-      return Swal.fire("Falta información", "Por favor ingresa tu nombre", "warning");
-
-    if (!studentInfo.last_name.trim())
-      return Swal.fire("Falta información", "Por favor ingresa tu apellido", "warning");
-
-    if (!studentInfo.email.trim())
-      return Swal.fire("Falta información", "Por favor ingresa tu correo", "warning");
-
-    const empty = formConfig.questions.some(q => {
-      const v = answers[q.id];
-      if (q.type === 3) return v.length === 0;
-      return !v || v === "";
+    const empty = questions.some(q => {
+      if (q.optional) return false;
+      const v = answers[q.id_question];
+      return !v || v.length === 0;
     });
 
     if (empty) {
-      return Swal.fire("Formulario incompleto", "Responde todas las preguntas", "warning");
+      Swal.fire("Formulario incompleto", "Responde todas las preguntas", "warning");
+      return false;
     }
 
     return true;
   };
-
 
   const submit = async () => {
     if (!validate()) return;
 
     setSubmitting(true);
     try {
+      /** @type {FormAnswerRequest} */
       const payload = {
         id_form: formId,
-        student: studentInfo,
-        answers: formConfig.questions.map(q => ({
-          id_question: q.id,
-          answers: Array.isArray(answers[q.id]) ? answers[q.id] : [answers[q.id]]
-        }))
+        answers,
       };
-      
-      await FormsApi.create(payload);
+
+      const res = await FormsApi.Answers().create(payload);
+      if (!res.ok) {
+        throw new Error(res.error.message || 'Error al enviar el formulario');
+      }
       Swal.fire("¡Listo!", "El formulario fue enviado con éxito", "success");
     } catch (err) {
       Swal.fire("Error", "No se pudo enviar el formulario", "error");
@@ -107,72 +160,72 @@ const StudentForm = ({ formId }) => {
     }
   };
 
+  /**
+   * @param {RenderableQuestion} q
+   * @param {number} index
+   */
   const renderQuestion = (q, index) => {
-    const val = answers[q.id];
+    const val = answers[q.id_question] ?? [];
 
     return (
-      <div key={q.id} className="gform-question-card">
+      <div key={q.id_question} className="gform-question-card">
         <div className="gform-question-title">
-          {index + 1}. {q.text}
-          <span className="gform-required">*</span>
+          {index + 1}. {q.question}
+          {!q.optional && <span className="gform-required">*</span>}
         </div>
 
-        {/* tipo 1: texto */}
-        {q.type === 1 && (
+        {q.type_name === QUESTION_TYPE.TEXT && (
           <input
             type="text"
             className="gform-text-input"
-            value={val}
-            onChange={e => handleAnswerChange(q.id, e.target.value, q.type)}
+            value={val[0] ?? ''}
+            onChange={e => handleAnswerChange(q.id_question, e.target.value, q.type_name)}
           />
         )}
 
-        {/* tipo 2: opción única */}
-        {q.type === 2 && (
+        {q.type_name === QUESTION_TYPE.SINGLE_CHOICE && (
           <div className="gform-options">
             {q.options.map((op, i) => (
               <label key={i} className="gform-radio-option">
                 <input
                   type="radio"
-                  name={q.id}
-                  value={op}
-                  checked={val === op}
-                  onChange={e => handleAnswerChange(q.id, e.target.value, q.type)}
+                  name={q.id_question}
+                  value={op.text}
+                  checked={val[0] === op.text}
+                  onChange={e => handleAnswerChange(q.id_question, e.target.value, q.type_name)}
                 />
-                {op}
+                {op.text}
               </label>
             ))}
           </div>
         )}
 
-        {/* tipo 3: múltiple */}
-        {q.type === 3 && (
+        {q.type_name === QUESTION_TYPE.MULTIPLE_CHOICE && (
           <div className="gform-options">
             {q.options.map((op, i) => (
               <label key={i} className="gform-checkbox-option">
                 <input
                   type="checkbox"
-                  value={op}
-                  checked={val.includes(op)}
-                  onChange={e => handleAnswerChange(q.id, e.target.value, q.type)}
+                  value={op.text}
+                  checked={val.includes(op.text)}
+                  onChange={e => handleAnswerChange(q.id_question, e.target.value, q.type_name)}
                 />
-                {op}
+                {op.text}
               </label>
             ))}
           </div>
         )}
 
-        {/* tipo 4: verdadero/falso */}
-        {q.type === 4 && (
+        {q.type_name === QUESTION_TYPE.BOOLEAN && (
           <div className="gform-options">
             {["Verdadero", "Falso"].map((op, i) => (
               <label key={i} className="gform-radio-option">
                 <input
                   type="radio"
-                  name={q.id}
+                  name={q.id_question}
                   value={op}
-                  checked={val === op}
-                  onChange={e => handleAnswerChange(q.id, e.target.value, q.type)}
+                  checked={val[0] === op}
+                  onChange={e => handleAnswerChange(q.id_question, e.target.value, q.type_name)}
                 />
                 {op}
               </label>
@@ -184,64 +237,17 @@ const StudentForm = ({ formId }) => {
   };
 
   if (loading || !formConfig) {
-
-    return <div className="gform-loading">Cargando...</div>; 
+    return <div className="gform-loading">Cargando...</div>;
   }
 
- return (
+  return (
     <div className="gform-container">
       <div className="gform-header">
-        <h1 className="gform-title">{formConfig?.name}</h1>
-        <p className="gform-description">{formConfig?.description}</p>
+        <h1 className="gform-title">{formConfig.name}</h1>
+        <p className="gform-description">{formConfig.description}</p>
       </div>
 
-      <div className="gform-section">
-        <h2 className="gform-section-title">Información del estudiante</h2>
-
-        {/* Campos de estudiante */}
-        <div className="gform-field">
-          <label className="gform-label">Cédula <span className="gform-required">*</span></label>
-          <input
-            type="text"
-            className="gform-input"
-            value={studentInfo.number_id}
-            onChange={e => setStudentInfo({ ...studentInfo, number_id: e.target.value })}
-          />
-        </div>
-
-        <div className="gform-field">
-          <label className="gform-label">Nombres <span className="gform-required">*</span></label>
-          <input
-            type="text"
-            className="gform-input"
-            value={studentInfo.first_name}
-            onChange={e => setStudentInfo({ ...studentInfo, first_name: e.target.value })}
-          />
-        </div>
-
-        <div className="gform-field">
-          <label className="gform-label">Apellidos <span className="gform-required">*</span></label>
-          <input
-            type="text"
-            className="gform-input"
-            value={studentInfo.last_name}
-            onChange={e => setStudentInfo({ ...studentInfo, last_name: e.target.value })}
-          />
-        </div>
-
-        <div className="gform-field">
-          <label className="gform-label">Correo electrónico <span className="gform-required">*</span></label>
-          <input
-            type="email"
-            className="gform-input"
-            value={studentInfo.email}
-            onChange={e => setStudentInfo({ ...studentInfo, email: e.target.value })}
-          />
-        </div>
-      </div>
-
-      {/* RENDERIZADO DE PREGUNTAS CON OPCIONES */}
-      {formConfig.questions.map((q, index) => renderQuestion(q, index))}
+      {questions.map((q, index) => renderQuestion(q, index))}
 
       <div className="gform-footer">
         <button
