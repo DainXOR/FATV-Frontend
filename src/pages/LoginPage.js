@@ -1,72 +1,58 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const LoginPage = ({ onLogin }) => {
-    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [inputError, setInputError] = useState({ username: false, password: false });
+    const [submitting, setSubmitting] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        // Hardcoded credentials for demo
-        if (username === 'admin' && password === 'password123') {
-            onLogin();
-            navigate('/');
-        } else {
-            setError('Invalid credentials');
-            setInputError({ username: true, password: true });
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setSubmitting(true);
+        setError('');
+        try {
+            await onLogin(email, password);
+            navigate('/dashboard', { replace: true });
+        } catch (err) {
+            setError(err.message || 'No se pudo iniciar sesión');
+        } finally {
+            setSubmitting(false);
         }
-    };
-
-    const handleUsernameChange = (e) => {
-        setUsername(e.target.value);
-        setInputError(prev => ({ ...prev, username: false }));
-        setError('');
-    };
-    const handlePasswordChange = (e) => {
-        setPassword(e.target.value);
-        setInputError(prev => ({ ...prev, password: false }));
-        setError('');
     };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '100px' }}>
-            <h2>Login</h2>
+            <h2>Iniciar sesión</h2>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', width: '300px' }}>
-                <label htmlFor="username" style={{ marginBottom: '4px' }}>Username</label>
+                <label htmlFor="email" style={{ marginBottom: '4px' }}>Correo electrónico</label>
                 <input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={handleUsernameChange}
-                    style={{
-                        marginBottom: '10px',
-                        padding: '8px',
-                        border: inputError.username ? '2px solid red' : '1px solid #ccc',
-                        outline: 'none',
-                        borderRadius: '4px'
-                    }}
+                    id="email"
+                    type="email"
+                    autoComplete="username"
+                    required
+                    placeholder="nombre@ejemplo.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    style={{ marginBottom: '10px', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
                 />
-                <label htmlFor="password" style={{ marginBottom: '4px' }}>Password</label>
+                <label htmlFor="password" style={{ marginBottom: '4px' }}>Contraseña</label>
                 <input
                     id="password"
                     type="password"
-                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    required
                     value={password}
-                    onChange={handlePasswordChange}
-                    style={{
-                        marginBottom: '10px',
-                        padding: '8px',
-                        border: inputError.password ? '2px solid red' : '1px solid #ccc',
-                        outline: 'none',
-                        borderRadius: '4px'
-                    }}
+                    onChange={(event) => setPassword(event.target.value)}
+                    style={{ marginBottom: '10px', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
                 />
-                <button type="submit" style={{ padding: '8px' }}>Login</button>
-                {error && <div style={{ color: 'red', marginTop: '10px' }}>{error}</div>}
+                <button type="submit" disabled={submitting} style={{ padding: '8px' }}>
+                    {submitting ? 'Ingresando…' : 'Ingresar'}
+                </button>
+                {error && <div role="alert" style={{ color: 'red', marginTop: '10px' }}>{error}</div>}
+                <p><Link to="/recover-password">¿Olvidaste tu contraseña?</Link></p>
+                <p><Link to="/setup-account">Tengo un código de configuración</Link></p>
             </form>
         </div>
     );

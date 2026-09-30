@@ -25,15 +25,15 @@ function optionalEnv(value, name) {
 
 export const config = {
     backendUrl: requireEnv(
-        process.env.REACT_APP_BACKEND_URL,
+        process.env.REACT_APP_BACKEND_URL || (process.env.NODE_ENV === 'test' ? 'http://localhost:8080' : undefined),
         "REACT_APP_BACKEND_URL"
     ),
     apiHealthPath: requireEnv(
-        process.env.REACT_APP_BACKEND_HEALTH_PATH,
+        process.env.REACT_APP_BACKEND_HEALTH_PATH || (process.env.NODE_ENV === 'test' ? 'info/ping' : undefined),
         "REACT_APP_BACKEND_HEALTH_PATH"
     ),
     apiRouteVersionPath: requireEnv(
-        process.env.REACT_APP_ROUTE_VERSION_PATH,
+        process.env.REACT_APP_ROUTE_VERSION_PATH || (process.env.NODE_ENV === 'test' ? 'info/route-version' : undefined),
         "REACT_APP_ROUTE_VERSION_PATH"
     ),
 

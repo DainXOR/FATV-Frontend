@@ -66,6 +66,18 @@ export class ApiBase {
      * @param {TRequest} body
      * @returns {Promise<import("../utils/types.js").ApiResult<TResponse>>}
      */
+    async updateById(id, body) {
+        return ApiClient.put(this.#route, {
+            pathParams: [id],
+            body
+        });
+    }
+
+    /**
+     * @param {string} id
+     * @param {TRequest} body
+     * @returns {Promise<import("../utils/types.js").ApiResult<TResponse>>}
+     */
     async patchById(id, body) {
         return ApiClient.patch(this.#route, {
             pathParams: [id],

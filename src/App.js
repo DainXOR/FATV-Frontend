@@ -14,6 +14,9 @@ import AddSupportPage from './pages/AddSupportPage';
 import FormCreatorPage from './pages/FormCreatorPage';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
+import SendFormPage from './pages/SendFormPage';
+import AccountCodePage from './pages/AccountCodePage';
 import { AuthProvider, useAuth } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import { config } from "./utils/config";
@@ -33,6 +36,8 @@ const MainLayout = ({ user }) => {
         else if (view === 'support-history') navigate('/dashboard/support-history', 'replace');
         else if (view === 'support') navigate('/dashboard/support', 'replace');
         else if (view === 'form') navigate('/dashboard/form', 'replace');
+        else if (view === 'send-form') navigate('/dashboard/send-form', 'replace');
+        else if (view === 'admin') navigate('/dashboard/admin', 'replace');
     };
     return (
         <div className="contact-form-container">
@@ -42,7 +47,7 @@ const MainLayout = ({ user }) => {
                     onMouseLeave={() => setCollapsed(true)}
                 >
                     <img src="/logo1.png" className="logo" alt="logo" style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard', 'replace')} />
-                    <Botones onNavigate={goTo} collapsed={collapsed} />
+                    <Botones onNavigate={goTo} collapsed={collapsed} isAdmin={user.roleCode === 'admin'} />
                 </div>
                 <div className="form-grid">
                     <div className="main-container">
@@ -51,10 +56,12 @@ const MainLayout = ({ user }) => {
                     <Routes>
                         <Route path="" element={<HomePage />} />
                         <Route path="register" element={<RegisterStudentPage user={user} />} /> 
-                        <Route Here---- path="edit" element={<EditStudentsPage />} />
+                        <Route path="edit" element={<EditStudentsPage />} />
                         <Route path="support-history" element={<SupportHistoryPage />} />
                         <Route path="support" element={<AddSupportPage />} />
                         <Route path="form" element={<FormCreatorPage />} />
+                        <Route path="send-form" element={<SendFormPage />} />
+                        <Route path="admin" element={user.roleCode === 'admin' ? <AdminSettingsPage /> : <Navigate to="" replace />} />
                         <Route path="*" element={<Navigate to="" />} />
                     </Routes>
                 </div>
@@ -65,25 +72,28 @@ const MainLayout = ({ user }) => {
 
 // Helper: StudentForm route (no sidebar)
 const StudentFormRoute = () => {
-    const { formId } = useParams();
-    return <StudentForm formId={formId} />;
+    const { token } = useParams();
+    return <StudentForm token={token} />;
 };
 
 
 const App = () => {
-    const user = {
-        name: 'Daniel León',
-        role: 'Administrator'
-    };
-    const { isAuthenticated, login } = useAuth();
+    const { user, login } = useAuth();
+    const displayUser = user ? {
+        name: user.email,
+        role: user.role === 'admin' ? 'Administrator' : 'Staff',
+        roleCode: user.role
+    } : { name: '', role: '' };
     return (
         <Router>
             <Routes>
                 <Route path="/login" element={<LoginPage onLogin={login} />} />
-                <Route path="/student-form/:formId" element={<StudentFormRoute />} />
+                <Route path="/setup-account" element={<AccountCodePage mode="setup" />} />
+                <Route path="/recover-password" element={<AccountCodePage mode="recovery" />} />
+                <Route path="/student-form/:token" element={<StudentFormRoute />} />
                 <Route path="/dashboard/*" element={
                     <ProtectedRoute>
-                        <MainLayout user={user} />
+                        <MainLayout user={displayUser} />
                     </ProtectedRoute>
                 } />
                 <Route path="/" element={<Navigate to="/dashboard" />} />

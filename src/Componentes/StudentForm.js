@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import '../Estilos/StudentForm.css';
 
-import FormsApi from '../api/FormsApi';
+import PublicFormsApi from '../api/PublicFormsApi';
 
 /**
  * @typedef {import("../Models/FormModels.js").FormResult} FormResult
  * @typedef {import("../Models/FormModels.js").QuestionInfo} QuestionInfo
  * @typedef {import("../Models/FormModels.js").FormQuestionResult} FormQuestionResult
  * @typedef {import("../Models/FormModels.js").FormQuestionTypeResult} FormQuestionTypeResult
- * @typedef {import("../Models/FormModels.js").FormAnswerRequest} FormAnswerRequest
  * @typedef {import("../Models/FormModels.js").Answers} Answers
  */
 
@@ -32,46 +31,47 @@ const QUESTION_TYPE = {
  * @property {string} type_name
  */
 
-const StudentForm = ({ formId }) => {
+const StudentForm = ({ token }) => {
   const [formConfig, setFormConfig] = useState(/** @type {FormResult | null} */(null));
   const [questions, setQuestions] = useState(/** @type {RenderableQuestion[]} */([]));
 
   const [answers, setAnswers] = useState(/** @type {Answers} */({}));
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     const loadForm = async () => {
+      setSubmitted(false);
       try {
-        const resForm = await FormsApi.getById(formId);
+        const resForm = await PublicFormsApi.getForm(token);
         if (!resForm.ok) {
           throw new Error(resForm.error.message || 'Error al cargar el formulario');
         }
         const form = resForm.body.data;
 
-        const resTypes = await FormsApi.Questions().Types().getAll();
-        if (!resTypes.ok) {
-          throw new Error(resTypes.error.message || 'Error al cargar los tipos de pregunta');
-        }
-        /** @type {Map<string, FormQuestionTypeResult>} */
-        const typesById = new Map(resTypes.body.data.map(t => [t.id, t]));
-
         /** @type {QuestionInfo[]} */
-        const questionInfos = Object.values(form.sections).flat();
+        const questionInfos = Object.values(form.sections || {}).flat();
 
         const questionResults = await Promise.all(
-          questionInfos.map(qi => FormsApi.Questions().getById(qi.id_question))
+          questionInfos.map(qi => PublicFormsApi.getQuestion(token, qi.id_question))
         );
+        questionResults.forEach(res => {
+          if (!res.ok) throw new Error(res.error?.message || 'Error al cargar una pregunta');
+        });
 
+        const typeResults = await Promise.all(
+          questionResults.map(res => PublicFormsApi.getQuestionType(token, res.body.data.id_question_type))
+        );
+        typeResults.forEach(res => {
+          if (!res.ok) throw new Error(res.error?.message || 'Error al cargar un tipo de pregunta');
+        });
         /** @type {RenderableQuestion[]} */
         const renderable = questionInfos.map((qi, i) => {
           const res = questionResults[i];
-          if (!res.ok) {
-            throw new Error(res.error.message || 'Error al cargar una pregunta');
-          }
           /** @type {FormQuestionResult} */
           const q = res.body.data;
-          const type = typesById.get(q.id_question_type);
+          const type = typeResults[i].body.data;
 
           return {
             id_question: qi.id_question,
@@ -100,7 +100,7 @@ const StudentForm = ({ formId }) => {
       }
     };
     loadForm();
-  }, [formId]);
+  }, [token]);
 
   /**
    * @param {string} questionId
@@ -142,16 +142,11 @@ const StudentForm = ({ formId }) => {
 
     setSubmitting(true);
     try {
-      /** @type {FormAnswerRequest} */
-      const payload = {
-        id_form: formId,
-        answers,
-      };
-
-      const res = await FormsApi.Answers().create(payload);
+      const res = await PublicFormsApi.submit(token, answers);
       if (!res.ok) {
         throw new Error(res.error.message || 'Error al enviar el formulario');
       }
+      setSubmitted(true);
       Swal.fire("¡Listo!", "El formulario fue enviado con éxito", "success");
     } catch (err) {
       Swal.fire("Error", "No se pudo enviar el formulario", "error");
@@ -238,6 +233,14 @@ const StudentForm = ({ formId }) => {
 
   if (loading || !formConfig) {
     return <div className="gform-loading">Cargando...</div>;
+  }
+  if (submitted) {
+    return (
+      <div className="gform-container">
+        <h1>¡Gracias!</h1>
+        <p>Tu formulario fue enviado correctamente.</p>
+      </div>
+    );
   }
 
   return (

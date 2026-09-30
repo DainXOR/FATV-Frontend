@@ -71,32 +71,32 @@ export class Api {
         this.#client = axios.create({
             baseURL: `${this.#apiUrl}/v${this.#routeVersion}/`,
             timeout: 5000,
+            withCredentials: true,
         });
 
         this.#client.interceptors.request.use((config) => {
-            const fullURL = `${config.baseURL}${config.url}`;
-            console.log(`Request URL: ${config.method?.toUpperCase()} ${fullURL}`);
-            console.log("Request Data:", config.data);
-
-            
+            // Do not log URLs: invitation URLs contain bearer-like tokens.
+            // Never log request bodies: login and recovery bodies contain secrets.
             // const token = authStore.getToken();
             if (this.#token) {
                 config.headers.Authorization = `Bearer ${this.#token}`;
             }
             
 
+            const unsafe = !["get", "head", "options"].includes((config.method || "get").toLowerCase());
+            if (unsafe && typeof document !== "undefined") {
+                const csrf = document.cookie.split("; ").find((part) => part.startsWith("fatv_csrf="));
+                if (csrf) config.headers["X-CSRF-Token"] = decodeURIComponent(csrf.substring("fatv_csrf=".length));
+            }
             config.headers["X-Request-ID"] = crypto.randomUUID();
 
             return config;
         });
 
         this.#client.interceptors.response.use(
-            (response) => {
-                console.log(`Response Status: ${response.status} for ${response.config.url}`);
-                return response;
-            },
+            (response) => response,
             (error) => {
-                console.log(`Response Status: ${error.status} for ${error.config.url}`);
+                console.warn(`API request failed (${error.response?.status ?? "network error"})`);
                 return Promise.reject(error)
             }
         );
@@ -167,9 +167,10 @@ export class Api {
      * @returns {boolean}
      */
     #uncheckedConnect() {
-        this.#client = axios.create({ 
+        this.#client = axios.create({
             baseURL: `${this.#apiUrl}/v${this.#routeVersion}/`,
-            timeout: 5000
+            timeout: 5000,
+            withCredentials: true
         });
 
         return true;
@@ -264,10 +265,8 @@ export class Api {
      * @returns {Promise<import("../utils/types.js").ApiResult<TResponse>>}
      */
     async #request(method, path, options = {}) {
-        const {pathParams = [], queryParams = {}, body} = options;
+        const {queryParams = {}, body} = options;
         const fullPath = this.#buildRequestUrl(path, options);
-
-        console.log(`API Request: ${method.toUpperCase()} ${fullPath}`);
 
         try {
             const response = await this.#Client().request({

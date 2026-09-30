@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, User, BookOpen, Clock, FileText, Edit3} from 'lucide-react';
+import { Calendar, User, BookOpen, Clock, FileText } from 'lucide-react';
 import MonthPicker from "../Componentes/MonthPicker";
 
 
@@ -162,7 +162,7 @@ const TutoringHistoryView = () => {
     try {
       /** @type {SessionRequest} */
       session.status = newStatus;
-      const response = await SessionsApi.updateById(sessionId, session); // aqui
+      await SessionsApi.updateById(sessionId, session); // aqui
       // Actualizar el estado local
       const updatedSessions = sessions.map((session) =>
         session.id === sessionId ? { ...session, status: newStatus } : session

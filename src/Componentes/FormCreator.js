@@ -2,6 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import '../Estilos/FormCreator.css';
 import { Button } from '@mui/material';
 import FormApi from '../api/FormsApi.js';
+import StudentsApi from '../api/StudentsApi.js';
+import ApiClient from '../api/ApiClient.js';
 import Swal from 'sweetalert2';
 import {
   INITIAL_SECTION_WEIGHTS,
@@ -173,6 +175,12 @@ const FormCreator = ({ onBack }) => {
   const [formSubView, setFormSubView] = useState(/** @type {'list' | 'editor'} */('list'));
   const [forms, setForms] = useState(/** @type {FormResult[]} */([]));
   const [selectedFormId, setSelectedFormId] = useState(/** @type {string} */(''));
+  const [students, setStudents] = useState(/** @type {StudentResult[]} */([]));
+  const [selectedInvitationStudents, setSelectedInvitationStudents] = useState(/** @type {string[]} */([]));
+  const [invitationExpiryDays, setInvitationExpiryDays] = useState('7');
+  const [sendingInvitations, setSendingInvitations] = useState(false);
+  const [invitationFeedback, setInvitationFeedback] = useState('');
+  const [invitations, setInvitations] = useState([]);
   const [isSavingForm, setIsSavingForm] = useState(/** @type {boolean} */(false));
   // Fraction (0-1) of the form-editor width given to the question picker column.
   // Defaults to giving the form/builder side more room, per user preference.
@@ -782,9 +790,13 @@ const FormCreator = ({ onBack }) => {
     const fetchForms = async () => {
       await refreshForms();
     };
+    const fetchStudents = async () => {
+      await refreshStudents();
+    };
 
     fetchQuestions();
     fetchForms();
+    fetchStudents();
   }, []);
 
   /**
@@ -1227,7 +1239,7 @@ const FormCreator = ({ onBack }) => {
     );
   };
 
-  const getFormUrl = (/** @type {string} */ formId) => `${window.location.origin}/student-form/${formId}`;
+  // Student access links are issued individually by the backend; form IDs are not public links.
 
   const handleSplitDragStart = (/** @type {React.MouseEvent} */ e) => {
     e.preventDefault();
@@ -1381,17 +1393,81 @@ const FormCreator = ({ onBack }) => {
   const refreshForms = async () => {
     try {
       const response = await FormApi.getAll();
-
-      if (!response.ok) {
-        throw new Error(response.error.message || 'Error al cargar formularios');
-      }
-
+      if (!response.ok) throw new Error(response.error.message || 'Error al cargar formularios');
       setForms(response.body.data);
     } catch (error) {
       const caught = /** @type {Error & { message?: string }} */ (error);
       console.error('Error cargando formularios:', caught);
       setForms([]);
     }
+  };
+
+  const refreshStudents = async () => {
+    try {
+      const response = await StudentsApi.getAll();
+      if (!response.ok) throw new Error(response.error?.message || 'Error al cargar estudiantes');
+      setStudents(Array.isArray(response.body.data) ? response.body.data : []);
+    } catch (error) {
+      console.error('Error cargando estudiantes:', error);
+      setStudents([]);
+    }
+  };
+
+  const loadInvitations = async (formId = selectedFormId) => {
+    if (!formId) return;
+    const response = await ApiClient.get('form-invitations', { queryParams: { form_id: formId } });
+    if (!response.ok) throw new Error(response.error?.details?.error || 'No se pudieron cargar las invitaciones');
+    setInvitations(response.body.invitations || []);
+  };
+
+  const sendInvitations = async () => {
+    if (!selectedFormId || selectedInvitationStudents.length === 0) {
+      setInvitationFeedback('Selecciona al menos un estudiante.');
+      return;
+    }
+    const days = Number(invitationExpiryDays);
+    if (!Number.isInteger(days) || days < 1 || days > 30) {
+      setInvitationFeedback('La vigencia debe estar entre 1 y 30 días.');
+      return;
+    }
+    setSendingInvitations(true);
+    setInvitationFeedback('');
+    try {
+      const response = await ApiClient.post('form-invitations', {
+        body: {
+          form_id: selectedFormId,
+          student_ids: selectedInvitationStudents,
+          expires_at: new Date(Date.now() + days * 86400000).toISOString(),
+        },
+      });
+      if (!response.ok) throw new Error(response.error?.details?.error || 'No se pudieron enviar las invitaciones');
+      setInvitationFeedback(`Enviados: ${response.body.sent}. Fallidos: ${response.body.failed}.`);
+      setSelectedInvitationStudents([]);
+      await loadInvitations();
+    } catch (error) {
+      const caught = /** @type {Error} */ (error);
+      setInvitationFeedback(caught.message || 'No se pudieron enviar las invitaciones');
+    } finally {
+      setSendingInvitations(false);
+    }
+  };
+
+  const revokeInvitation = async (invitationId) => {
+    const confirmation = await Swal.fire({
+      title: '¿Revocar invitación?',
+      text: 'El enlace dejará de funcionar inmediatamente.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Revocar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!confirmation.isConfirmed) return;
+    const response = await ApiClient.delete('form-invitations', { pathParams: [invitationId] });
+    if (!response.ok) {
+      Swal.fire('Error', 'No se pudo revocar la invitación.', 'error');
+      return;
+    }
+    await loadInvitations();
   };
 
   /**
@@ -1478,42 +1554,15 @@ const FormCreator = ({ onBack }) => {
     hydrateFormBuilderFromResult(detailedForm);
     setCurrentView('forms');
     setFormSubView('editor');
-  };
-
-  /**
-   * Copies text to the clipboard and shows a confirmation popup.
-   *
-   * @param {string} value
-   * @param {string} successText
-   * @returns {Promise<void>}
-   */
-  const copyTextToClipboard = async (value, successText) => {
-    if (!value) {
-      return;
-    }
-
     try {
-      await navigator.clipboard.writeText(value);
-      Swal.fire({
-        title: '¡Copiado!',
-        text: successText,
-        icon: 'success',
-        confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#673ab7',
-        timer: 2000,
-      });
+      await loadInvitations(form.id);
+      setInvitationFeedback('');
     } catch (error) {
-      const caught = /** @type {Error & { message?: string }} */ (error);
-      console.error('Error al copiar:', caught);
-      Swal.fire({
-        title: 'Error',
-        text: 'No se pudo copiar el contenido al portapapeles',
-        icon: 'error',
-        confirmButtonText: 'Aceptar',
-        confirmButtonColor: '#d33',
-      });
+      setInvitationFeedback(error.message || 'No se pudieron cargar las invitaciones');
     }
   };
+
+  // Invitation tokens are only delivered by email and are never copied from this screen.
 
   const deleteForm = async (/** @type {FormResult} */ form) => {
     const confirmed = await Swal.fire({
@@ -1775,10 +1824,10 @@ const renderQuestionListContent = (mode = 'manage') => {
                                   </button>
                                   <button
                                     className="q-edit-btn"
-                                    onClick={() => copyTextToClipboard(getFormUrl(form.id), 'URL del formulario copiada al portapapeles.')}
-                                    title="Copiar URL"
+                                    onClick={() => openFormForEditing(form)}
+                                    title="Enviar formulario a estudiantes"
                                   >
-                                    🔗
+                                    ✉
                                   </button>
                                   <button className="q-delete-btn" onClick={() => deleteForm(form)} title="Eliminar">
                                     🗑
@@ -1845,18 +1894,59 @@ const renderQuestionListContent = (mode = 'manage') => {
                         {formSuccess && <div className="form-success">{formSuccess}</div>}
 
                         {selectedFormId && (
-                          <div className="generated-url-box">
-                            <label>URL del formulario para el estudiante:</label>
-                            <div className="url-display">
-                              <input type="text" readOnly value={getFormUrl(selectedFormId)} className="url-input" />
-                              <Button
-                                variant="outlined"
-                                onClick={() => copyTextToClipboard(getFormUrl(selectedFormId), 'URL del formulario copiada al portapapeles.')}
-                              >
-                                Copiar URL
+                          <section className="generated-url-box" aria-labelledby="send-form-heading">
+                            <h4 id="send-form-heading">Enviar formulario</h4>
+                            <p>Se enviará un enlace individual por correo. Cada invitación tiene su propia fecha de vencimiento y admite un solo envío.</p>
+                            <label htmlFor="invitation-students">Estudiantes caracterizados</label>
+                            <select
+                              id="invitation-students"
+                              multiple
+                              value={selectedInvitationStudents}
+                              onChange={(event) => setSelectedInvitationStudents(Array.from(event.target.selectedOptions, option => option.value))}
+                              style={{ display: 'block', width: '100%', minHeight: '150px', margin: '8px 0 14px' }}
+                            >
+                              {students.map(student => (
+                                <option key={student.id} value={student.id}>
+                                  {student.first_name} {student.last_name} — {student.institution_email || student.email || 'Sin correo'}
+                                </option>
+                              ))}
+                            </select>
+                            <label htmlFor="invitation-expiry">Vigencia del enlace</label>
+                            <select
+                              id="invitation-expiry"
+                              value={invitationExpiryDays}
+                              onChange={event => setInvitationExpiryDays(event.target.value)}
+                              style={{ display: 'block', margin: '8px 0 14px' }}
+                            >
+                              {[1, 3, 7, 14, 30].map(days => <option key={days} value={days}>{days} día(s)</option>)}
+                            </select>
+                            <div className="form-editor-actions">
+                              <Button variant="contained" onClick={sendInvitations} disabled={sendingInvitations || selectedInvitationStudents.length === 0}>
+                                {sendingInvitations ? 'Enviando…' : 'Enviar por correo'}
+                              </Button>
+                              <Button variant="outlined" onClick={() => loadInvitations().catch(error => setInvitationFeedback(error.message))}>
+                                Actualizar estado
                               </Button>
                             </div>
-                          </div>
+                            {invitationFeedback && <p role="status">{invitationFeedback}</p>}
+                            {invitations.length > 0 && (
+                              <table className="questions-table">
+                                <thead><tr><th>Estudiante ID</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
+                                <tbody>
+                                  {invitations.map(invitation => (
+                                    <tr key={invitation.id}>
+                                      <td>{invitation.student_id}</td>
+                                      <td>{new Date(invitation.expires_at).toLocaleString('es-CO')}</td>
+                                      <td>{invitation.status}</td>
+                                      <td>{invitation.status === 'pending' && (
+                                        <button type="button" className="q-delete-btn" onClick={() => revokeInvitation(invitation.id)}>Revocar</button>
+                                      )}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </section>
                         )}
                       </div>
                     </div>
